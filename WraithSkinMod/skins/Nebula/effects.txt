@@ -1,0 +1,21 @@
+; WraithSkinMod effects for "Nebula". Colours are #RRGGBB. Remove a line to keep the original.
+FlameOuter=#4D226E
+FlameMiddle=#68358F
+FlameCore=#9349CC
+FlameSwirl=3
+FlameSparkle=1.5
+FlameSpeed=0.2
+EyeColour=#68358F
+EyeGlow=50
+HelmetLines1=#65318D
+HelmetLines2=#68358F
+GlowColour=#68358F
+PulseFlash=#9349CC
+BoostCharge=#68358F
+FlameLight=#9349CC
+SwordTint=#7917C5
+SwordBlade=#1F121F
+SwordHilt=#65318D
+SwordGlint=#68358F
+SwordGlow=#9349CC
+SwordBoostGlow=#7917C5

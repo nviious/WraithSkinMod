@@ -1,0 +1,73 @@
+{
+  "name": "Cotton Candy",
+  "author": "WraithSkinMod",
+  "format": "wraith-skin",
+  "version": 2,
+  "made": "WraithSkinMod website",
+  "parts": {
+    "head": [
+      "#aa1d94"
+    ],
+    "crest": [
+      "#d428e8"
+    ],
+    "mask": [
+      "#fffdf8",
+      "#42739a",
+      "#ae2a96"
+    ],
+    "collar": [
+      "#5d8ab6",
+      "#c914cd"
+    ],
+    "jacket": [
+      "#ff007e",
+      "#00b5ff"
+    ],
+    "trim": [
+      "#b4c1c1"
+    ],
+    "tunic": [
+      "#ff007e",
+      "#00b5ff"
+    ],
+    "armor": [
+      "#6e96b2"
+    ],
+    "caps": [
+      "#780c81"
+    ],
+    "shoes": [
+      "#1c81f0"
+    ],
+    "boots": [
+      "#4145b9"
+    ]
+  },
+  "effects": {
+    "FlameOuter": "#760067",
+    "FlameMiddle": "#fa00ff",
+    "FlameCore": "#00b1ff",
+    "FlameBrightness": 1.6,
+    "FlameFalloff": 1.66,
+    "FlameSparkle": 1.4,
+    "FlameTaper": 0.3,
+    "FlameSpeed": 0.5,
+    "EyeColour": "#db24ff",
+    "HelmetLines1": "#141932",
+    "HelmetLines2": "#141932",
+    "GlowColour": "#db24ff",
+    "PulseFlash": "#cd00ff",
+    "BoostCharge": "#801b6d",
+    "FlameLight": "#db24ff",
+    "SwordTint": "#1f2f81",
+    "SwordBlade": "#801b6d",
+    "SwordHilt": "#f100fd",
+    "SwordGlyphDarkness": 0.2,
+    "SwordGlint": "#ef31ff",
+    "SwordGlow": "#cd00ff",
+    "SwordAuraStrength": 0,
+    "SwordSilhouette": 0.1,
+    "SwordBoostGlow": "#ff32f7"
+  }
+}

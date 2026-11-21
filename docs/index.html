@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WraithSkinMod</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --canvas:#1c1c1c; --panel:#262626; --raised:#2f2f2f; --hover:#353535; --line:#3a3a3a; --line-soft:#303030;
+  --text:#e8e8e8; --muted:#9a9a9a; --faint:#6f6f6f; --accent:#4c8dff; --accent-ink:#fff; --danger:#f07167;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--canvas);color:var(--text);font:13px/1.4 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* layout: model on the left, one settings panel on the right */
+.app{display:grid;grid-template-columns:minmax(0,1fr) 360px;height:100%}
+@media (max-width:860px){.app{grid-template-columns:1fr;height:auto}.viewer{height:60vh}}
+
+.viewer{position:relative;min-height:360px;background:var(--canvas)}
+#view{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+#view.dragging{cursor:grabbing}
+.views{position:absolute;left:12px;bottom:12px;display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px}
+.views button{background:none;border:0;border-radius:4px;padding:4px 10px;color:var(--muted)}
+.views button:hover{color:var(--text);background:var(--hover)}
+.hint{position:absolute;left:14px;top:12px;color:var(--faint);font-size:12px;pointer-events:none}
+
+.panel{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+@media (max-width:860px){.panel{border-left:0;border-top:1px solid var(--line)}}
+.top{padding:12px;border-bottom:1px solid var(--line);display:grid;gap:8px}
+.top .names{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.scroll{overflow-y:auto;flex:1;min-height:0}
+
+/* inputs */
+.input{width:100%;min-width:0;background:var(--raised);border:1px solid transparent;border-radius:5px;padding:6px 8px}
+.input:hover{border-color:var(--line)}
+.input:focus{border-color:var(--accent);outline:none}
+.input::placeholder{color:var(--faint)}
+label.lab{display:grid;gap:4px;font-size:11px;color:var(--muted)}
+select.input{padding:5px 6px}
+.btn{background:var(--raised);border:1px solid var(--line);border-radius:5px;padding:6px 10px;white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.small{padding:3px 8px;font-size:12px}
+.btn.link{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;text-underline-offset:2px}
+.btn.link:hover{color:var(--text)}
+.actions{display:flex;gap:8px;align-items:center}
+.actions .btn.primary{flex:1}
+.icon{background:none;border:0;border-radius:4px;width:24px;height:24px;display:inline-grid;place-items:center;color:var(--faint);padding:0;flex:none}
+.icon:hover{background:var(--hover);color:var(--text)}
+.icon svg{width:14px;height:14px}
+
+/* sections */
+.sec{border-bottom:1px solid var(--line-soft)}
+.sec-head{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:10px 12px;text-align:left;font-weight:600}
+.sec-head:hover{background:var(--hover)}
+.sec-head .chev{width:12px;height:12px;color:var(--faint);transition:transform .12s;flex:none}
+.sec.open .sec-head .chev{transform:rotate(90deg)}
+.sec-head .title{flex:1}
+.badge{font-size:11px;font-weight:500;color:var(--accent)}
+.sec-body{display:none;padding:2px 12px 12px}
+.sec.open .sec-body{display:block}
+.sub{font-size:11px;color:var(--faint);margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em}
+.sub:first-child{margin-top:2px}
+
+/* property rows: label left, control right */
+.prop{display:grid;grid-template-columns:minmax(0,1fr) auto 24px;align-items:center;gap:8px;min-height:32px;padding:2px 6px;margin:0 -6px;border-radius:5px}
+.prop.sel{background:rgba(76,141,255,.12)}
+.prop .lbl{min-width:0}
+.prop .lbl small{display:block;color:var(--faint);font-size:11px;line-height:1.3}
+.prop .ctl{display:flex;align-items:center;gap:6px}
+.prop .reset{visibility:hidden}
+.prop.changed .reset{visibility:visible}
+.prop.changed .lbl > span{color:var(--text)}
+.prop .lbl > span{color:#cfcfcf}
+.note{grid-column:1 / -1;font-size:11px;color:var(--muted);padding:0 0 4px}
+.mode{background:var(--raised);border:1px solid transparent;border-radius:5px;padding:3px 4px;font-size:12px;color:var(--muted)}
+.mode:hover{border-color:var(--line)}
+.swatch{width:24px;height:24px;border-radius:5px;border:1px solid rgba(255,255,255,.16);padding:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+.swatch:hover{border-color:rgba(255,255,255,.5)}
+.swatch.active,.swatch[aria-expanded="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.hex{font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);width:52px;text-align:right}
+input[type=range]{width:110px;accent-color:var(--accent)}
+.num{width:44px;background:var(--raised);border:1px solid transparent;border-radius:4px;padding:3px 4px;text-align:right;font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
+.num:focus{border-color:var(--accent);outline:none}
+.thumb{width:24px;height:24px;border-radius:5px;border:1px solid rgba(255,255,255,.16);background:var(--raised) center/cover}
+.status{font-size:12px;color:var(--muted)}
+.status:empty{display:none}
+.status.err{color:var(--danger)}
+.muted{color:var(--muted);font-size:12px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.row + .row{margin-top:6px}
+.stack{display:grid;gap:8px}
+
+/* colours from an image */
+.drop{border:1px dashed var(--line);border-radius:6px;padding:12px;text-align:center;color:var(--muted)}
+.drop:hover,.drop.over{border-color:var(--accent);color:var(--text)}
+#pickImg{max-width:100%;max-height:120px;border-radius:5px;cursor:crosshair;display:none}
+.palette{display:flex;gap:6px;flex-wrap:wrap}
+.palette button{width:24px;height:24px;border-radius:5px;border:1px solid rgba(255,255,255,.16);padding:0}
+.palette button:hover{border-color:rgba(255,255,255,.5)}
+
+.foot{padding:12px;color:var(--faint);font-size:11px;line-height:1.45}
+.foot p{margin:0 0 6px}
+code{font:11px ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--raised);padding:1px 4px;border-radius:3px}
+.hidden{display:none !important}
+
+/* colour picker */
+.picker{position:fixed;z-index:20;width:240px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.pk-sv{position:relative;height:140px;border-radius:5px;overflow:hidden;cursor:crosshair;touch-action:none;outline:none}
+.pk-sv:focus-visible,.pk-hue:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+.pk-sv canvas{width:100%;height:100%;display:block}
+.pk-dot{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.6);pointer-events:none}
+.pk-hue{position:relative;height:10px;margin:10px 6px 2px;border-radius:5px;cursor:pointer;touch-action:none;outline:none;
+  background:linear-gradient(90deg,#f00,#ff0 17%,#0f0 33%,#0ff 50%,#00f 67%,#f0f 83%,#f00)}
+.pk-knob{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.6);pointer-events:none}
+.pk-row{display:flex;align-items:center;gap:6px;margin-top:10px}
+.pk-prev{display:flex;width:36px;height:24px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.16);flex:none}
+.pk-old,.pk-new{flex:1;cursor:pointer}
+.pk-hexlab{display:flex;flex:1;min-width:0}
+.pk-hex{width:100%;min-width:0;background:var(--raised);border:1px solid transparent;border-radius:5px;padding:4px 6px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--text)}
+.pk-hex:focus{border-color:var(--accent);outline:none}
+.pk-hex.bad{border-color:var(--danger)}
+.pk-sub{margin:10px 0 4px;font-size:11px;color:var(--faint)}
+.pk-recent{display:flex;flex-wrap:wrap;gap:5px;min-height:20px}
+.pk-recent button{width:20px;height:20px;border-radius:4px;border:1px solid rgba(255,255,255,.16);padding:0}
+.pk-recent button:hover{border-color:rgba(255,255,255,.5)}
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="viewer">
+    <canvas id="view" aria-label="3D preview of the stand-in figure"></canvas>
+    <div class="views" role="group" aria-label="Camera">
+      <button type="button" data-view="front">Front</button>
+      <button type="button" data-view="side">Side</button>
+      <button type="button" data-view="back">Back</button>
+    </div>
+    <div class="hint">Drag to rotate · scroll to zoom · click a part to edit it</div>
+  </section>
+  <aside class="panel">
+    <div class="top">
+      <div class="names">
+        <label class="lab">Skin name<input class="input" type="text" id="skinName" maxlength="40" placeholder="My Wraith"></label>
+        <label class="lab">Made by<input class="input" type="text" id="skinAuthor" maxlength="40" placeholder="Optional"></label>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="exportZip" type="button">Download skin</button>
+        <button class="btn" id="openFile" type="button">Open…</button>
+        <input type="file" id="fileIn" accept=".zip,.png,.json,application/zip,image/png,application/json" hidden>
+      </div>
+      <div class="status" id="fileStatus"></div>
+    </div>
+    <div class="scroll">
+      <div id="sections"></div>
+      <div class="sec" id="sec-image">
+        <button class="sec-head" type="button" aria-expanded="false"><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span class="title">Colours from an image</span></button>
+        <div class="sec-body stack">
+          <div class="drop" id="imgDrop" tabindex="0" role="button">Drop a picture here, or click to choose one</div>
+          <input type="file" id="imgIn" accept="image/*" hidden>
+          <img id="pickImg" alt="Your picture: click it to pick an exact colour">
+          <div class="palette" id="palette"></div>
+          <div class="muted" id="paletteHint">Select a colour box above, then click a colour here or on the picture.</div>
+        </div>
+      </div>
+      <div class="sec" id="sec-presets">
+        <button class="sec-head" type="button" aria-expanded="false"><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span class="title">Presets</span></button>
+        <div class="sec-body stack">
+          <div class="row">
+            <select class="input" id="presetSel" aria-label="Saved presets" style="flex:1"></select>
+            <button class="btn small" id="presetLoad" type="button">Load</button>
+          </div>
+          <div class="row">
+            <button class="btn small" id="presetSave" type="button">Save as new</button>
+            <button class="btn small" id="presetUpdate" type="button">Update</button>
+            <button class="btn small" id="presetRename" type="button">Rename</button>
+            <button class="btn small" id="presetDelete" type="button">Delete</button>
+          </div>
+          <div class="row hidden" id="nameRow">
+            <input class="input" type="text" id="nameIn" maxlength="48" aria-label="Preset name" style="flex:1">
+            <button class="btn small primary" id="nameOk" type="button">Save</button>
+            <button class="btn small" id="nameCancel" type="button">Cancel</button>
+          </div>
+          <div class="row">
+            <button class="btn small" id="presetExport" type="button">Export file</button>
+            <button class="btn small" id="presetImport" type="button">Import file</button>
+            <input type="file" id="presetIn" accept=".json,application/json" hidden>
+          </div>
+          <div class="status" id="presetStatus"></div>
+          <div class="muted">Presets are kept in this browser. Export one as a file to use it elsewhere.</div>
+        </div>
+      </div>
+      <div class="foot">
+        <p>To install: unzip the download into <code>ue4ss\Mods\WraithSkinMod\skins\</code>, then press <b>F7</b> in the game to reload skins and <b>F6</b> to pick yours. <button class="btn link" id="exportPng" type="button">Download the colour image only</button></p>
+        <p>The figure is a stand-in with the Wraith's colour zones, not the game model; in-game shading will differ.</p>
+        <p>WraithSkinMod 0.75. Unofficial fan tool, not affiliated with or endorsed by the makers of Sword of the Sea. It includes the Wraith's original colour image so unchanged parts export exactly, and none of the game's models.</p>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script id="skin-data" type="application/json">{"width": 512, "height": 4096, "rowScale": 8, "fixedRows": ["#ffffff", "#feffff", "#fdfeff", "#fcfeff", "#fcfeff", "#fbfdff", "#fafdff", "#f9fdff", "#f8fcff", "#f7fcff", "#f7fcff", "#f7fcff", "#f5fbff", "#f4fbff", "#f3fbff", "#f2faff", "#f1faff", "#f1faff", "#f0f9ff", "#eff9ff", "#eef9ff", "#edf8ff", "#ecf8ff", "#ebf8ff", "#ebf7ff", "#eaf7ff", "#e9f7ff", "#e8f6ff", "#e7f6ff", "#e6f6ff", "#e6f5ff", "#e5f5ff", "#e4f5ff", "#e4f5ff", "#e2f4ff", "#e1f4ff", "#e0f4ff", "#e0f3ff", "#def3ff", "#dbf1ff", "#d8efff", "#d5eeff", "#d1ecff", "#ceebff", "#cae9ff", "#c7e8ff", "#c4e6ff", "#c1e5ff", "#bde3ff", "#bae0fe", "#b7e0fe", "#b3defe", "#b0dcfe", "#addbfe", "#a9d9fe", "#a6d8fe", "#a3d6fe", "#a0d4fe", "#9cd3fe", "#9ad2fe", "#96d0fe", "#92cffe", "#8fcdfe", "#8cccfe", "#88cafe", "#85c8fd", "#83c7fd", "#7fc5fd", "#7cc4fd", "#78c2fd", "#75c1fd", "#72bffd", "#6ebefd", "#6bbcfd", "#7a6e4a", "#7a6e4a", "#7a6e4a", "#7a6e4a"], "parts": [{"id": 12, "key": "head", "label": "Helmet", "group": "Head", "axis": null, "y0": 1868.3, "y1": 3202.7, "samples": [[63, 1843], [165, 1886], [138, 1888], [228, 1941], [123, 3229]], "note": "Also colours the top and bottom collar rings."}, {"id": 3, "key": "crest", "label": "Helmet crest", "group": "Head", "axis": "v", "y0": 1693.3, "y1": 1854.7, "samples": [[27, 1687], [78, 1811], [53, 1827], [81, 1839], [59, 1863]], "note": ""}, {"id": 2, "key": "mask", "label": "Face mask", "group": "Head", "axis": "v", "y0": 930.7, "y1": 1365.3, "samples": [[118, 930], [60, 945], [55, 963], [61, 1109], [293, 1365]], "note": ""}, {"id": 1, "key": "eyes", "label": "Eye outlines", "group": "Head", "axis": null, "y0": 637.7, "y1": 650.5, "samples": [[146, 637], [125, 640], [141, 642], [122, 647], [111, 650]], "note": ""}, {"id": 4, "key": "collar", "label": "Collar and gauntlets", "group": "Body", "axis": "v", "y0": 1890.3, "y1": 1921.3, "samples": [[109, 1869], [141, 1905], [172, 1911], [128, 1914], [240, 3176]], "note": "Also colours the gauntlets. The top and bottom collar rings follow Helmet instead."}, {"id": 9, "key": "jacket", "label": "Jacket", "group": "Body", "axis": "u", "y0": 3112.0, "y1": 3118.0, "samples": [[204, 3115], [153, 3115], [76, 3115], [10, 3115], [332, 3115], [460, 3115]], "note": "A gradient runs from the shoulders down the back and towards the front opening, not straight top to bottom."}, {"id": 5, "key": "trim", "label": "Jacket trim", "group": "Body", "axis": null, "y0": 2084.0, "y1": 2084.0, "samples": [[129, 2084], [124, 2084], [71, 2084], [90, 2084], [23, 2084]], "note": ""}, {"id": 6, "key": "tunic", "label": "Tunic, sleeves and greaves", "group": "Body", "axis": "v", "y0": 2100.0, "y1": 2149.3, "samples": [[140, 2100], [155, 2100], [252, 2100], [442, 2114], [212, 2156]], "note": ""}, {"id": 13, "key": "armor", "label": "Armour tiles and belt", "group": "Body", "axis": null, "y0": 1926.0, "y1": 1937.0, "samples": [[245, 1926], [55, 1929], [65, 1929], [301, 1929], [16, 1937]], "note": "One flat colour: every tile reads the same spot on the colour image."}, {"id": 11, "key": "frames", "label": "Armour panel frames", "group": "Body", "axis": "v", "y0": 3253.3, "y1": 3393.3, "samples": [[148, 3234], [450, 3276], [362, 3276], [356, 3276], [214, 3400]], "note": ""}, {"id": 10, "key": "band", "label": "Hem band", "group": "Body", "axis": "v", "y0": 3129.3, "y1": 3162.7, "samples": [[176, 3128], [318, 3136], [108, 3138], [192, 3149], [113, 3163]], "note": "Shares space with the helmet spike: if it differs from Helmet, the spike shows a stripe of this colour."}, {"id": 8, "key": "legs", "label": "Leg plates", "group": "Legs", "axis": null, "y0": 2964.0, "y1": 2966.0, "samples": [[196, 2964], [228, 2964], [215, 2964], [198, 2966], [216, 2966]], "note": ""}, {"id": 14, "key": "caps", "label": "Kneecaps", "group": "Legs", "axis": null, "y0": 1915.0, "y1": 1916.0, "samples": [[132, 1915], [116, 1916], [126, 1916], [117, 1916], [132, 1916]], "note": ""}, {"id": 7, "key": "shoes", "label": "Shoes and inner layers", "group": "Legs", "axis": null, "y0": 2356.0, "y1": 4060.0, "samples": [[162, 2322], [191, 2356], [172, 4048], [206, 4050], [13, 4060]], "note": ""}, {"id": 15, "key": "boots", "label": "Boot soles", "group": "Legs", "axis": null, "y0": 1946.0, "y1": 1946.0, "samples": [[142, 1945], [206, 1946], [32, 1946], [43, 1946], [45, 1946]], "note": ""}], "partmap": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAABAACAAAAAAhUgbBAAAbAklEQVR42u3d227cxhJA0SZNCGTy/5+aiBActV9iII4kz/DSZHfXWsDJQ05syKw9xYtnpJQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2jYMjkFoo0MgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAIQgEMgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAIQgEMgAARAVNPgGNgACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABCAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABCAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABCAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABCAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABCAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEwH7T4BjYAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAAQgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABEAbpkO/eknp1TG0ARAAAkAACAABIAAEQGr+QdATz3k8B+o4gOXf/5l0yFPAsnyogUABLA//BR0HsCxPJEGwuwAFRL8NVED05wCLBKI/CFJA9CeBixqCPwruaOoC3vWewOW1m1Evnm/ueVNo1Ydt06va/NM0HCtguO9Lnw//DusggH1vC79rB8yn/m6r8e/+XMCFBcylfmPzP/LBkGVtceac98mgeT31VXT9zC2Agx8Nm9emX+jmf8ZnA9td7uZ/PIBnV0CNZ3TzP2MDzM1ezpn/FaeAeq/lzb98ADXfyZl/4QAqv403/5IBeIaTQn007H/znhuYvwVQ7rOBLbz8zb/YKaCJ7W/+xTaA+fcUwOYDNZt/5FNAI9f+5n/6KWB172cDNDN+C6DIRaD5h94ADW3/WYjFnwQSbQOsc3UvjdkJ4MpTwPHbgLMn8/lXZP5FnwOsG04K14xi/fXrMf/L3g+wnv/u4cNfz2z+N36n0AoOvvmXCsCRtQEQAAJAAAgAASAABIAAEAC9B+BJsA2AABAAAqCvAFzf2QDJm8IFgAAQAAJwpZh8LuCwP373f/5tGE4B9L0BvMhtAASAAOgiAHeBNgACQAB4DpDa/jnyKezPFx9d4dkAHZq/yvjVyH81TFvf7jPcviznsreqS8mv/dUGuPb9Z75B2Okb4NqrhNm3CIu0AUq8y9QOaCCAom8vVsDNPz3c+8o7DWBtZdBWQNrzKHjt50c1WDRP3QUs1X+x+bZbgaXbJwFB/jLIDtj+HODBYVsbO/yuA87dAKsdECCAtadXnwIenQIcoUBW7wji8UVgb+vXhWDw9wQ6yX00/bnrl/21+Vd8u/SP9Y+HwjaAHeAawHWADWAHCMAGuP0UcMHrzmCjfC7ApIMEYNCBAjDskAEYe8wAzD3gXYCHsNEDIHkQhAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAAPjKNDgGNgACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABCAABIAAEgAAQAAJAAAgAAdC/aXAMbAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAKgH9PgGNgACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABCAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABCAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABCAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABCAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAB8bhocAxsAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAAHhsGhwDGwABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAJ+YhtKFvTvIVQdQfMP83DFCCBnACScb5fQRwOFyhNBiAKbmLgABIAD6DEBAsS8CxzS60AscwPjznxpwDUC8ANQTOwDzD3QN8PbxX82OXpwN8OZIOQVYAAIwfwGYvwAQgAVgAxA4AAvABiBUAC8WQIr9KPgleeunU4DThgAQgGZiB2D+TgEEDkAxNgCBAxCMDUDgAPRiAxA4ALkED8Bf+qTgHw59twd8Oji9i8DHw50M3AUgAASAbxRZaVouU24d02i5OQUgAH+2mAdpHBUQ9iKwosPux5VcHkBlLzoFXBlAhRvX/C8LYDTnvgN4q/nTwZu+i92Lqe944b718+lw3/PQnRICIG4AzgE2AFsD6OnS2W3AntvAFyN1CkAACAABIAAEgAAQAAJAAAgAASAABJC8KVgACAABIAAEgAAQAAJAAAgAASAABEAFpqGDP8RgjjYAAkAACAABcH8AOTu2gQPIOSUFRP128SYfOYD/TD97PhMugHzglw1WTuMBfJjDthWQPdVtOoB8zi/Nnu63GMAX099/FWAdtBRAsXNwVkEDAfxu/GfcCKig6gAevPrPuhXMIqgygEtvwKyCVNmj4Gee9+eTK/J3DNVsgLsmkW2BGjbA06/E7G8auwsg3z4CCdy7AfLR/zhLwDuCTktACpW9H2Djs4D98zN57wmkhQCyl27wDWDgTgGSCB2AedsA2ggdgDHbAIQOwAqwAQgdQLYRbAAiB5BdGwTfAGbtFEDoAKwAG0AIoQPIKrABLIPIAZi3DUDoAKwAG4DQAVgBKdwHQ74oIA9ycApAAAiAQNcArgdtAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAA3Gn67hjYAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAAQgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAAQgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAAQgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAAQgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAAlPUD4E3uctV2NrcAAAAASUVORK5CYII=", "original": {"head": ["#b6895d"], "crest": ["#ba8b5d"], "mask": ["#dfc68c", "#d0b585", "#cf9459"], "eyes": ["#e4cd8f"], "collar": ["#b6895d"], "jacket": ["#5d747b"], "trim": ["#799292"], "tunic": ["#799191"], "armor": ["#b6895e"], "frames": ["#5d747b"], "band": ["#5d747b"], "legs": ["#68594f"], "caps": ["#b6895d"], "shoes": ["#768281"], "boots": ["#b5885f"]}, "base": "data:image/png;base64,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"}</script>
+<script id="core">
+/* ---------- colour core (pure, also used by the test harness) ---------- */
+const Core = (() => {
+  const s2l = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  const l2s = c => { c = Math.min(1, Math.max(0, c)); return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; };
+  const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  const rgbToHex = c => '#' + c.map(v => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('');
+  const BRIGHT = 4;                       // the Wraith material multiplies the ramp by 4 (linear)
+  // colour at position t along a part's stops, as linear display RGB
+  function evalLinear(stops, t) {
+    const lin = stops.map(h => hexToRgb(h).map(s2l));
+    if (lin.length === 1) return lin[0];
+    t = Math.min(1, Math.max(0, t));
+    const seg = t * (lin.length - 1), i = Math.min(lin.length - 2, Math.floor(seg)), f = seg - i;
+    return [0, 1, 2].map(k => lin[i][k] * (1 - f) + lin[i + 1][k] * f);
+  }
+  const displayHex = (stops, t) => rgbToHex(evalLinear(stops, t).map(l2s));
+  const texToDisplay = rgb => rgb.map(v => l2s(s2l(v) * BRIGHT));
+  const jacketT = u => u < 0.40 ? (0.40 - u) / 0.40 : Math.min(1, Math.max(0, (u - 0.40) / 0.50));
+  // Build the 512 x 4096 RGBA colour image the mod loads.
+  // base (optional): {w, h, px} the original colour image as RGB bytes; parts set to null in design use it
+  function buildTexture(data, ids, design, base) {
+    const W = data.width, H = data.height, out = new Uint8ClampedArray(W * H * 4);
+    const byId = {}; data.parts.forEach(p => byId[p.id] = p);
+    const luts = {};
+    for (const p of data.parts) {
+      const stops = design[p.key] || (base ? null : (data.original && data.original[p.key]) || ['#808080']);
+      if (!stops) continue;
+      const n = p.axis === 'u' ? W : H, lut = new Uint8ClampedArray(n * 3);
+      for (let i = 0; i < n; i++) {
+        let t = 0;
+        if (stops.length > 1 && p.axis === 'v') t = (i + 0.5 - p.y0) / Math.max(1, p.y1 - p.y0);
+        if (stops.length > 1 && p.axis === 'u') t = jacketT((i + 0.5) / W);
+        const lin = evalLinear(stops, t);
+        for (let k = 0; k < 3; k++) lut[i * 3 + k] = Math.round(l2s(lin[k] / BRIGHT) * 255);
+      }
+      luts[p.id] = { lut, u: p.axis === 'u' };
+    }
+    const fixed = data.fixedRows.map(hexToRgb);
+    for (let y = 0; y < H; y++) {
+      const row = Math.floor((y + 0.5) / data.rowScale);
+      for (let x = 0; x < W; x++) {
+        const o = (y * W + x) * 4, id = ids[y * W + x];
+        if ((id === 0 || !luts[id]) && base) {
+          const b = (Math.min(base.h - 1, Math.floor(y * base.h / H)) * base.w + Math.min(base.w - 1, Math.floor(x * base.w / W))) * 3;
+          out[o] = base.px[b]; out[o + 1] = base.px[b + 1]; out[o + 2] = base.px[b + 2];
+        }
+        else if (id === 0) { const c = fixed[Math.min(row, fixed.length - 1)]; out[o] = c[0] * 255; out[o + 1] = c[1] * 255; out[o + 2] = c[2] * 255; }
+        else { const L = luts[id]; const i = (L.u ? x : y) * 3; out[o] = L.lut[i]; out[o + 1] = L.lut[i + 1]; out[o + 2] = L.lut[i + 2]; }
+        out[o + 3] = 255;
+      }
+    }
+    return out;
+  }
+  // Read a design back from a skin image: getPixel(x, y) in 512 x 4096 space returns texture RGB 0..1
+  function readSkin(data, getPixel) {
+    const design = {};
+    for (const p of data.parts) {
+      const cols = p.samples.map(([x, y]) => texToDisplay(getPixel(x, y)));
+      if (!cols.length) continue;
+      const avg = [0, 1, 2].map(k => cols.reduce((a, c) => a + c[k], 0) / cols.length);
+      const first = cols[0], last = cols[cols.length - 1];
+      const diff = Math.max(...[0, 1, 2].map(k => Math.abs(first[k] - last[k])));
+      if (p.axis === 'v' && diff > 0.08) design[p.key] = [rgbToHex(first), rgbToHex(last)];
+      else if (p.axis === 'u' && diff > 0.08) design[p.key] = [rgbToHex(cols[0]), rgbToHex(cols[3])];
+      else design[p.key] = [rgbToHex(avg)];
+    }
+    return design;
+  }
+  return { s2l, l2s, hexToRgb, rgbToHex, evalLinear, displayHex, texToDisplay, jacketT, buildTexture, readSkin };
+})();
+if (typeof module !== 'undefined') module.exports = Core;
+</script>
+<script id="app">
+(() => {
+const DATA = JSON.parse(document.getElementById('skin-data').textContent);
+const PARTS = DATA.parts, BYKEY = {}; PARTS.forEach(p => BYKEY[p.key] = p);
+const $ = id => document.getElementById(id);
+
+/* ---------- effects the mod can change (keys match the mod's effects.txt) ---------- */
+const FX = [
+  { group: 'Helmet flame', key: 'FlameOuter', label: 'Outer flame', def: '#005076' },
+  { group: 'Helmet flame', key: 'FlameMiddle', label: 'Middle flame', note: 'barely visible in the game', def: '#00B1FF' },
+  { group: 'Helmet flame', key: 'FlameCore', label: 'Flame core', def: '#00B1FF' },
+  { group: 'Helmet flame', key: 'FlameBrightness', label: 'Brightness', def: 1, min: 0, max: 4, step: 0.05 },
+  { group: 'Helmet flame', key: 'FlameGlow', label: 'Glow', def: 2, min: 0, max: 10, step: 0.1 },
+  { group: 'Helmet flame', key: 'FlameCoreGlow', label: 'Core glow', def: 15, min: 0, max: 50, step: 0.5 },
+  { group: 'Helmet flame', key: 'FlameWidth', label: 'Width', def: 1, min: 0.2, max: 3, step: 0.05 },
+  { group: 'Flame shape', key: 'FlameFalloff', label: 'Height', note: 'lower = taller, fuller flame', def: 1.29, min: 0, max: 3, step: 0.01 },
+  { group: 'Flame shape', key: 'FlameSwirl', label: 'Swirl', note: 'wispy, swirling flame', def: 0.03, min: 0, max: 6, step: 0.01 },
+  { group: 'Flame shape', key: 'FlameSparkle', label: 'Sparkle', note: 'breaks the flame into sparkles', def: 0.56, min: 0, max: 6, step: 0.01 },
+  { group: 'Flame shape', key: 'FlameTaper', label: 'Taper', def: -0.1, min: -1, max: 3, step: 0.05 },
+  { group: 'Flame shape', key: 'FlameSpeed', label: 'Speed', def: 0.7, min: 0, max: 10, step: 0.05 },
+  { group: 'Flame shape', key: 'FlameCoreSize', label: 'Core size', def: 3.11, min: 0, max: 8, step: 0.01 },
+  { group: 'Eyes', key: 'EyeColour', label: 'Eye colour', def: '#7EE7FF' },
+  { group: 'Eyes', key: 'EyeGlow', label: 'Eye glow', def: 25, min: 0, max: 100, step: 1 },
+  { group: 'Helmet lines', key: 'HelmetLines1', label: 'Lines, colour 1', def: '#152721' },
+  { group: 'Helmet lines', key: 'HelmetLines2', label: 'Lines, colour 2', def: '#2C3530' },
+  { group: 'Glows and light', key: 'GlowColour', label: 'Glow colour', note: 'body and jacket, when the game makes you glow', def: '#7EE7FF' },
+  { group: 'Glows and light', key: 'PulseFlash', label: 'Pulse flash', note: 'body and jacket, when you pulse', def: '#85F9FF' },
+  { group: 'Glows and light', key: 'BoostCharge', label: 'Boost charge', note: 'while charging a boost', def: '#BCAC90' },
+  { group: 'Glows and light', key: 'FlameLight', label: 'Flame light on the body', def: '#83D0FF' },
+  { group: 'Glows and light', key: 'FlameLightStrength', label: 'Flame light strength', def: 0.6, min: 0, max: 3, step: 0.05 },
+  { group: 'Trim embroidery', key: 'TrimColour', label: 'Embroidery colour', def: '#716348' },
+  { group: 'Trim embroidery', key: 'TrimBrightness', label: 'Embroidery brightness', def: 0.35, min: 0, max: 2, step: 0.05 },
+  { group: 'Body looks', key: 'BodyTint', label: 'Tint', note: 'multiplies every colour', def: '#FFFFFF' },
+  { group: 'Body looks', key: 'BodySaturation', label: 'Extra saturation', def: 0, min: 0, max: 4, step: 0.05 },
+  { group: 'Body looks', key: 'BodyBrightness', label: 'Brightness', def: 4, min: 0, max: 16, step: 0.1 },
+  { group: 'Body looks', key: 'BodyAura', label: 'Aura colour', def: '#7EE7FF' },
+  { group: 'Body looks', key: 'BodyAuraStrength', label: 'Aura', note: '0 off, 1 full glow around it', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Body looks', key: 'BodyFlash', label: 'Pulse flash', def: '#85F9FF' },
+  { group: 'Body looks', key: 'BodyLava', label: 'Lava', note: 'glowing molten look', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Body looks', key: 'BodyLavaColour', label: 'Lava colour', note: 'used when Lava is above 0', def: '#FFAB21' },
+  { group: 'Body looks', key: 'BodyLavaGlowColour', label: 'Lava glow in the patterns', note: 'used when Lava is above 0', def: '#FFD600' },
+  { group: 'Body looks', key: 'BodyDamage', label: 'Colour wash', note: 'the game uses this for damage', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Body looks', key: 'BodyDamageColour', label: 'Wash colour', def: '#FF0000' },
+  { group: 'Body looks', key: 'BodyDirt', label: 'Dirt', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Body looks', key: 'BodyWet', label: 'Wet', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Body looks', key: 'BodySilhouette', label: 'Silhouette', note: 'black, eyes still glow', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Body looks', key: 'BodyShadingLines', label: 'Shading lines', note: '0 gives a dark sketched look', def: 0.95, min: 0, max: 2, step: 0.05 },
+  { group: 'Body looks', key: 'BodyMetalContrast', label: 'Metal contrast', def: 1, min: 0, max: 2, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketTint', label: 'Tint', note: 'multiplies every colour', def: '#FFFFFF' },
+  { group: 'Jacket looks', key: 'JacketSaturation', label: 'Extra saturation', def: 0, min: 0, max: 4, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketBrightness', label: 'Brightness', def: 4, min: 0, max: 16, step: 0.1 },
+  { group: 'Jacket looks', key: 'JacketAura', label: 'Aura colour', def: '#7EE7FF' },
+  { group: 'Jacket looks', key: 'JacketAuraStrength', label: 'Aura', note: '0 off, 1 full glow around it', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketFlash', label: 'Pulse flash', def: '#85F9FF' },
+  { group: 'Jacket looks', key: 'JacketLava', label: 'Lava', note: 'glowing molten look', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketLavaColour', label: 'Lava colour', note: 'used when Lava is above 0', def: '#FFAB21' },
+  { group: 'Jacket looks', key: 'JacketLavaGlowColour', label: 'Lava glow in the patterns', note: 'used when Lava is above 0', def: '#FFD600' },
+  { group: 'Jacket looks', key: 'JacketDamage', label: 'Colour wash', note: 'the game uses this for damage', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketDamageColour', label: 'Wash colour', def: '#FF0000' },
+  { group: 'Jacket looks', key: 'JacketDirt', label: 'Dirt', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketWet', label: 'Wet', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketSilhouette', label: 'Silhouette', note: 'black, eyes still glow', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketShadingLines', label: 'Shading lines', note: '0 gives a dark sketched look', def: 0.95, min: 0, max: 2, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketMetalContrast', label: 'Metal contrast', def: 1, min: 0, max: 2, step: 0.05 },
+  { group: 'Jacket looks', key: 'JacketAltColours', label: 'Alternate colours', note: "the game's other jacket colours", def: 0, min: 0, max: 1, step: 1 },
+  { group: 'Jacket looks', key: 'JacketEmbroidery', label: 'Embroidery (jacket only)', def: '#716348' },
+  { group: 'Jacket looks', key: 'JacketPattern', label: 'Pattern image', note: 'drawn over the jacket', kind: 'image', file: 'jacket_pattern.png' },
+  { group: 'Hoversword', key: 'SwordTint', label: 'Blade tint', note: 'the main blade colour', def: '#A68359' },
+  { group: 'Hoversword', key: 'SwordBlade', label: 'Inner blade', def: '#C0A06B' },
+  { group: 'Hoversword', key: 'SwordHilt', label: 'Hilt', def: '#606C6A' },
+  { group: 'Hoversword', key: 'SwordGlyphDarkness', label: 'Engravings', note: '0 none, 1 black', def: 0.55, min: 0, max: 1, step: 0.05 },
+  { group: 'Hoversword', key: 'SwordPattern', label: 'Engraving image', note: 'replaces the engraving pattern', kind: 'image', file: 'sword_pattern.png' },
+  { group: 'Hoversword', key: 'SwordColourMask', label: 'Colour areas image', note: 'advanced: which areas take which colour', kind: 'image', file: 'sword_mask.png' },
+  { group: 'Hoversword', key: 'SwordGlint', label: 'Glint', note: 'the light sweeping along the blade', def: '#FFE07C' },
+  { group: 'Hoversword', key: 'SwordGlow', label: 'Glow colour', note: 'tricks and pulses', def: '#00B3FF' },
+  { group: 'Hoversword', key: 'SwordAuraStrength', label: 'Glow always on', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Hoversword', key: 'SwordSilhouette', label: 'Silhouette', def: 0, min: 0, max: 1, step: 0.05 },
+  { group: 'Hoversword', key: 'SwordBoostGlow', label: 'Boost glow', note: 'while boosting', def: '#32D9FF' },
+  { group: 'Booster jets', key: 'JetWidth', label: 'Width', def: 60, min: 0, max: 300, step: 1 },
+  { group: 'Booster jets', key: 'JetHeight', label: 'Height', def: 60, min: 0, max: 300, step: 1 },
+  { group: 'Booster jets', key: 'JetOpacity', label: 'Visibility', note: '0 hides the jets', def: 1, min: 0, max: 1, step: 0.05 },
+];
+const FX_NOTES = {
+  'Helmet lines': 'Thin lines drawn on the helmet. Not shown on the stand-in figure.',
+  'Flame shape': 'The stand-in flame does not change shape; check these in the game.',
+  'Glows and light': 'These show in the game during pulses, boosts and near the flame. The stand-in only hints at them.',
+  'Body looks': 'Everything except the jacket. The stand-in only approximates these looks.',
+  'Jacket looks': 'The same looks for the jacket on its own, plus a pattern image.',
+  'Hoversword': 'Blade tint is the strongest blade colour. The images replace the patterns on the blade.',
+  'Booster jets': 'The glow at the back of the hoversword. Only its size and visibility can change.',
+};
+const isImageFx = f => f.kind === 'image';
+const FXKEY = {}; FX.forEach(f => FXKEY[f.key] = f);
+const isColourFx = f => f.kind !== 'image' && typeof f.def === 'string';
+const FX_GROUPS = [...new Set(FX.map(f => f.group))];
+
+/* ---------- state ---------- */
+// design[key] = null keeps the game's original colours; an array of hex stops replaces them
+// fx[key] = null keeps the game's original effect value
+let design = {}, fx = {};
+const blank = () => { PARTS.forEach(p => design[p.key] = null); FX.forEach(f => fx[f.key] = null); };
+blank();
+const stopsOf = key => design[key] || DATA.original[key];
+const makeCustom = key => { if (!design[key]) design[key] = DATA.original[key].slice(); return design[key]; };
+const fxVal = key => fx[key] != null ? fx[key] : FXKEY[key].def;
+let selected = null, activeStop = null;     // activeStop = {key, index} for a part, or {fx: key}
+const openSecs = new Set(['head']);
+let needsRender = true; const meshes = [], fxMeshes = [];
+function status(id, msg, err) { const e = $(id); e.textContent = msg; e.classList.toggle('err', !!err); }
+
+/* ---------- design <-> plain object ---------- */
+const HEX = /^#[0-9a-f]{6}$/i;
+function snapshot() {
+  const parts = {}, effects = {};
+  PARTS.forEach(p => { if (design[p.key]) parts[p.key] = design[p.key].slice(); });
+  FX.forEach(f => { if (fx[f.key] != null) effects[f.key] = fx[f.key]; });
+  return { parts, effects };
+}
+function applySnapshot(s) {
+  blank();
+  const parts = (s && s.parts) || {}, effects = (s && s.effects) || {};
+  for (const p of PARTS) {
+    const v = parts[p.key];
+    if (Array.isArray(v) && v.length && v.every(h => HEX.test(h))) design[p.key] = v.slice(0, p.axis ? 3 : 1).map(h => h.toLowerCase());
+  }
+  for (const f of FX) {
+    let v = effects[f.key]; if (v == null) v = effects[f.key.replace('Colour', 'Color')];
+    if (v == null && f.key === 'SwordTint') v = effects.SwordGlyphs;   // older name for the same setting
+    if (v == null) continue;
+    if (isImageFx(f)) { if (typeof v === 'string' && /^data:image\/png;base64,/.test(v) && v.length < 4e6) fx[f.key] = v; continue; }
+    if (isColourFx(f)) { v = String(v); if (!v.startsWith('#')) v = '#' + v; if (HEX.test(v)) fx[f.key] = v.toLowerCase(); }
+    else { v = Number(v); if (isFinite(v)) fx[f.key] = Math.min(f.max, Math.max(f.min, v)); }
+  }
+}
+const sameAsSaved = () => JSON.stringify(snapshot()) === cleanState;
+let cleanState = JSON.stringify(snapshot());
+
+/* ---------- presets in this browser ---------- */
+const STORE = 'wraithskinmod.presets.v1', DRAFT = 'wraithskinmod.draft.v1';
+let storageOk = true;
+try { localStorage.setItem('wraithskinmod.test', '1'); localStorage.removeItem('wraithskinmod.test'); } catch (e) { storageOk = false; }
+const readJSON = (k, d) => { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : d; } catch (e) { return d; } };
+const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
+let presets = (readJSON(STORE, []) || []).filter(p => p && p.id && p.name && p.data);
+const BUILTIN = { id: 'builtin:original', name: 'Original Wraith', builtin: true, data: { parts: {}, effects: {} } };
+let currentPreset = BUILTIN.id;
+const allPresets = () => [BUILTIN, ...presets];
+const findPreset = id => allPresets().find(p => p.id === id);
+function savePresets() { if (!writeJSON(STORE, presets)) status('presetStatus', 'This browser would not save presets. Use "Share current design" to keep a copy as a file.', true); }
+function renderPresets() {
+  const sel = $('presetSel'); sel.innerHTML = '';
+  for (const p of allPresets()) {
+    const o = document.createElement('option'); o.value = p.id;
+    o.textContent = p.builtin ? p.name + ' (built in)' : p.name; sel.appendChild(o);
+  }
+  sel.value = findPreset(currentPreset) ? currentPreset : BUILTIN.id;
+  syncPresetButtons();
+}
+function syncPresetButtons() {
+  const p = findPreset($('presetSel').value), b = !p || p.builtin;
+  $('presetUpdate').disabled = b; $('presetRename').disabled = b; $('presetDelete').disabled = b;
+  [$('presetSave'), $('presetUpdate'), $('presetRename'), $('presetDelete')].forEach(x => { if (!storageOk) x.disabled = true; });
+}
+$('presetSel').onchange = () => { armed = null; syncPresetButtons(); };
+let armed = null;   // two-click confirmations: 'load' or 'delete'
+function confirmTwice(what, msg) {
+  if (armed === what) { armed = null; return true; }
+  armed = what; status('presetStatus', msg, true); return false;
+}
+$('presetLoad').onclick = () => {
+  const p = findPreset($('presetSel').value); if (!p) return;
+  if (!sameAsSaved() && !confirmTwice('load', 'You have changes that are not in a preset. Click Load again to replace them.')) return;
+  applySnapshot(p.data);
+  if (!p.builtin) { $('skinName').value = p.data.name || p.name; $('skinAuthor').value = p.data.author || ''; }
+  currentPreset = p.id; cleanState = JSON.stringify(snapshot());
+  renderAll(); recolor(); saveDraft();
+  status('presetStatus', 'Loaded "' + p.name + '".');
+};
+let nameMode = null;   // 'new' or 'rename'
+function askName(mode, initial) {
+  nameMode = mode; $('nameRow').classList.remove('hidden'); $('nameIn').value = initial; $('nameIn').focus(); $('nameIn').select();
+  $('nameOk').textContent = mode === 'rename' ? 'Rename' : 'Save';
+}
+function closeName() { nameMode = null; $('nameRow').classList.add('hidden'); }
+$('presetSave').onclick = () => askName('new', $('skinName').value.trim() || 'My preset');
+$('presetRename').onclick = () => { const p = findPreset($('presetSel').value); if (p && !p.builtin) askName('rename', p.name); };
+$('nameCancel').onclick = closeName;
+$('nameIn').onkeydown = e => { if (e.key === 'Enter') $('nameOk').click(); if (e.key === 'Escape') closeName(); };
+$('nameOk').onclick = () => {
+  const name = $('nameIn').value.trim().slice(0, 48); if (!name) { $('nameIn').focus(); return; }
+  if (nameMode === 'new') {
+    const p = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, saved: new Date().toISOString(), data: { ...snapshot(), name: $('skinName').value.trim(), author: $('skinAuthor').value.trim() } };
+    presets.push(p); currentPreset = p.id; cleanState = JSON.stringify(snapshot());
+    savePresets(); status('presetStatus', 'Saved "' + name + '" in this browser.');
+  } else if (nameMode === 'rename') {
+    const p = findPreset($('presetSel').value);
+    if (p && !p.builtin) { p.name = name; savePresets(); status('presetStatus', 'Renamed to "' + name + '".'); }
+  }
+  closeName(); renderPresets();
+};
+$('presetUpdate').onclick = () => {
+  const p = findPreset($('presetSel').value); if (!p || p.builtin) return;
+  p.data = { ...snapshot(), name: $('skinName').value.trim(), author: $('skinAuthor').value.trim() }; p.saved = new Date().toISOString();
+  currentPreset = p.id; cleanState = JSON.stringify(snapshot()); savePresets();
+  status('presetStatus', 'Updated "' + p.name + '" with the current design.');
+};
+$('presetDelete').onclick = () => {
+  const p = findPreset($('presetSel').value); if (!p || p.builtin) return;
+  if (!confirmTwice('delete', 'Click Delete again to remove "' + p.name + '" from this browser.')) return;
+  presets = presets.filter(x => x !== p); if (currentPreset === p.id) currentPreset = BUILTIN.id;
+  savePresets(); renderPresets(); status('presetStatus', 'Deleted "' + p.name + '".');
+};
+$('presetExport').onclick = async () => {
+  const name = $('skinName').value.trim() || (findPreset(currentPreset) || BUILTIN).name;
+  const blob = new Blob([JSON.stringify(skinJson(name, $('skinAuthor').value.trim()), null, 2)], { type: 'application/json' });
+  try { const r = await offerFile(safeName(name) + '.wraithskin.json', blob); status('presetStatus', r === 'declined' ? 'Save cancelled.' : 'Saved the current design as a preset file.'); }
+  catch (e) { status('presetStatus', 'Could not save the file here: ' + (e.message || e.code), true); }
+};
+$('presetImport').onclick = () => $('presetIn').click();
+$('presetIn').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    if (!j || (!j.parts && !j.effects)) throw new Error('this is not a WraithSkinMod preset');
+    applySnapshot(j);
+    const name = String(j.name || f.name.replace(/(\.wraithskin)?\.json$/i, '')).slice(0, 48) || 'Imported preset';
+    $('skinName').value = j.name || ''; $('skinAuthor').value = j.author || '';
+    if (storageOk) {
+      const p = { id: 'p' + Date.now().toString(36), name, saved: new Date().toISOString(), data: { ...snapshot(), name: j.name || '', author: j.author || '' } };
+      presets.push(p); currentPreset = p.id; savePresets();
+    }
+    cleanState = JSON.stringify(snapshot());
+    renderAll(); recolor(); saveDraft(); renderPresets();
+    status('presetStatus', storageOk ? 'Imported "' + name + '" and added it to your presets.' : 'Opened "' + name + '" (this browser cannot keep presets).');
+  } catch (err) { status('presetStatus', 'Could not import ' + f.name + ': ' + err.message, true); }
+};
+
+/* ---------- draft autosave ---------- */
+let draftTimer = null;
+function saveDraft() {
+  if (!storageOk) return;
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => writeJSON(DRAFT, { ...snapshot(), name: $('skinName').value, author: $('skinAuthor').value, preset: currentPreset, clean: cleanState }), 300);
+}
+function changed() { armed = null; saveDraft(); }
+$('skinName').oninput = $('skinAuthor').oninput = saveDraft;
+
+/* ---------- colour picker (our own, replaces the browser's) ---------- */
+const Picker = (() => {
+  const RECENT = 'wraithskinmod.recent.v1';
+  let recent = []; try { recent = JSON.parse(localStorage.getItem(RECENT) || '[]').filter(h => /^#[0-9a-f]{6}$/i.test(h)).slice(0, 12); } catch (e) {}
+  const el = document.createElement('div'); el.className = 'picker'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Colour picker'); el.hidden = true;
+  el.innerHTML =
+    '<div class="pk-sv" tabindex="0" role="slider" aria-label="Saturation and brightness"><canvas width="240" height="150"></canvas><span class="pk-dot"></span></div>' +
+    '<div class="pk-hue" tabindex="0" role="slider" aria-label="Hue" aria-valuemin="0" aria-valuemax="360"><span class="pk-knob"></span></div>' +
+    '<div class="pk-row"><span class="pk-prev"><span class="pk-old" title="Before"></span><span class="pk-new" title="Now"></span></span>' +
+    '<label class="pk-hexlab">Hex <input class="pk-hex" type="text" maxlength="7" spellcheck="false" aria-label="Hex colour"></label>' +
+    '<button type="button" class="btn small primary pk-done">Done</button></div>' +
+    '<div class="pk-sub">Recent</div><div class="pk-recent"></div>';
+  document.body.appendChild(el);
+  const sv = el.querySelector('.pk-sv'), cv = sv.querySelector('canvas'), dot = sv.querySelector('.pk-dot');
+  const hue = el.querySelector('.pk-hue'), knob = hue.querySelector('.pk-knob');
+  const hexIn = el.querySelector('.pk-hex'), oldSw = el.querySelector('.pk-old'), newSw = el.querySelector('.pk-new'), recentEl = el.querySelector('.pk-recent');
+  let h = 0, s = 0, v = 0, cb = null, anchor = null, startHex = '#000000';
+
+  const hsvToHex = (h, s, v) => {
+    const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+    return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+  };
+  const hexToHsv = hex => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let hh = 0;
+    if (d) hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [(hh * 60 + 360) % 360, mx ? d / mx : 0, mx];
+  };
+  function paintSV() {
+    const g = cv.getContext('2d'), W = cv.width, H = cv.height;
+    g.fillStyle = hsvToHex(h, 1, 1); g.fillRect(0, 0, W, H);
+    const wg = g.createLinearGradient(0, 0, W, 0); wg.addColorStop(0, '#fff'); wg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = wg; g.fillRect(0, 0, W, H);
+    const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, 'rgba(0,0,0,0)'); bg.addColorStop(1, '#000'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  }
+  function show(fromHex) {
+    const hex = hsvToHex(h, s, v);
+    dot.style.left = (s * 100) + '%'; dot.style.top = ((1 - v) * 100) + '%'; dot.style.background = hex;
+    knob.style.left = (h / 360 * 100) + '%'; knob.style.background = hsvToHex(h, 1, 1);
+    sv.setAttribute('aria-valuetext', 'saturation ' + Math.round(s * 100) + '%, brightness ' + Math.round(v * 100) + '%');
+    hue.setAttribute('aria-valuenow', Math.round(h));
+    newSw.style.background = hex;
+    if (!fromHex) hexIn.value = hex.toUpperCase();
+    return hex;
+  }
+  function emit(fromHex) { const hex = show(fromHex); if (cb) cb(hex); }
+  // Dragging: one pointer at a time, and it always ends when the button is released,
+  // even if the release happens outside the page.
+  function dragger(area, apply) {
+    let id = null;
+    const at = e => { const r = area.getBoundingClientRect(); apply(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))); };
+    const end = () => { if (id !== null) { try { area.releasePointerCapture(id); } catch (e) {} id = null; area.classList.remove('dragging'); } };
+    area.addEventListener('pointerdown', e => { if (e.button !== 0) return; e.preventDefault(); id = e.pointerId; area.setPointerCapture(id); area.classList.add('dragging'); area.focus(); at(e); });
+    area.addEventListener('pointermove', e => { if (id === null || e.pointerId !== id) return; if (e.buttons === 0) { end(); return; } at(e); });
+    area.addEventListener('pointerup', end); area.addEventListener('pointercancel', end); area.addEventListener('lostpointercapture', end);
+    window.addEventListener('blur', end);
+  }
+  dragger(sv, (x, y) => { s = x; v = 1 - y; emit(); });
+  dragger(hue, x => { h = Math.min(359.9, x * 360); paintSV(); emit(); });
+  sv.addEventListener('keydown', e => {
+    const st = e.shiftKey ? 0.1 : 0.02, k = e.key;
+    if (k === 'ArrowLeft') s = Math.max(0, s - st); else if (k === 'ArrowRight') s = Math.min(1, s + st);
+    else if (k === 'ArrowUp') v = Math.min(1, v + st); else if (k === 'ArrowDown') v = Math.max(0, v - st); else return;
+    e.preventDefault(); emit();
+  });
+  hue.addEventListener('keydown', e => {
+    const st = e.shiftKey ? 15 : 3;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') h = (h - st + 360) % 360; else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') h = (h + st) % 360; else return;
+    e.preventDefault(); paintSV(); emit();
+  });
+  hexIn.addEventListener('input', () => {
+    let t = hexIn.value.trim(); if (!t.startsWith('#')) t = '#' + t;
+    if (/^#[0-9a-f]{3}$/i.test(t)) t = '#' + t[1] + t[1] + t[2] + t[2] + t[3] + t[3];
+    if (/^#[0-9a-f]{6}$/i.test(t)) { [h, s, v] = hexToHsv(t.toLowerCase()); paintSV(); emit(true); hexIn.classList.remove('bad'); }
+    else hexIn.classList.toggle('bad', t.length >= 4);
+  });
+  hexIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); close(true); } });
+  oldSw.addEventListener('click', () => { [h, s, v] = hexToHsv(startHex); paintSV(); emit(); });
+  el.querySelector('.pk-done').addEventListener('click', () => close(true));
+  function renderRecent() {
+    recentEl.innerHTML = '';
+    if (!recent.length) { recentEl.innerHTML = '<span class="muted">Colours you pick appear here.</span>'; return; }
+    for (const c of recent) {
+      const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.title = c.toUpperCase(); b.setAttribute('aria-label', 'Use ' + c);
+      b.onclick = () => { [h, s, v] = hexToHsv(c); paintSV(); emit(); };
+      recentEl.appendChild(b);
+    }
+  }
+  function remember(hex) {
+    if (hex === startHex) return;
+    recent = [hex, ...recent.filter(c => c !== hex)].slice(0, 12);
+    try { localStorage.setItem(RECENT, JSON.stringify(recent)); } catch (e) {}
+  }
+  function place() {
+    if (!anchor) return;
+    const r = anchor.getBoundingClientRect(), pw = el.offsetWidth, ph = el.offsetHeight, m = 8;
+    let x = r.left + r.width / 2 - pw / 2, y = r.bottom + 8;
+    if (y + ph > innerHeight - m) y = Math.max(m, r.top - ph - 8);
+    x = Math.max(m, Math.min(innerWidth - pw - m, x));
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+  }
+  function open(a, hex, onChange) {
+    if (!el.hidden) close();
+    anchor = a; cb = onChange; startHex = hex.toLowerCase();
+    [h, s, v] = hexToHsv(startHex); oldSw.style.background = startHex;
+    el.hidden = false; paintSV(); show(); renderRecent(); place();
+    anchor.setAttribute('aria-expanded', 'true');
+    setTimeout(() => sv.focus(), 0);
+  }
+  // refocus: return keyboard focus to the swatch (keyboard and Done); not when closed by clicking elsewhere
+  function close(refocus) {
+    if (el.hidden) return;
+    remember(hsvToHex(h, s, v));
+    el.hidden = true;
+    if (anchor) { anchor.setAttribute('aria-expanded', 'false'); if (refocus) anchor.focus({ preventScroll: true }); }
+    anchor = null; cb = null;
+  }
+  document.addEventListener('pointerdown', e => { if (!el.hidden && !el.contains(e.target) && e.target !== anchor) close(); }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !el.hidden) { [h, s, v] = hexToHsv(startHex); emit(); close(true); } });
+  window.addEventListener('resize', place);
+  document.addEventListener('scroll', e => { if (!el.hidden && !el.contains(e.target)) place(); }, true);
+  return { open, close, isOpen: () => !el.hidden };
+})();
+// A swatch button that opens the picker; onChange(hex) runs live while picking.
+function makeSwatch(hex, label, onChange, onFocus) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'swatch'; b.style.background = hex; b.dataset.hex = hex;
+  b.setAttribute('aria-label', label + ', ' + hex.toUpperCase() + '. Click to change'); b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('aria-expanded', 'false');
+  b.addEventListener('click', () => {
+    if (onFocus) onFocus();
+    Picker.open(b, b.dataset.hex, h => { b.dataset.hex = h; b.style.background = h; b.setAttribute('aria-label', label + ', ' + h.toUpperCase() + '. Click to change'); onChange(h); });
+  });
+  return b;
+}
+
+/* ---------- settings panel: collapsible sections of property rows ---------- */
+// Each section lists colour parts (from the colour image) and/or effect groups.
+const SECTIONS = [
+  { id: 'head',   title: 'Head',             parts: ['head', 'crest', 'mask', 'eyes'], fx: ['Eyes', 'Helmet lines'] },
+  { id: 'flame',  title: 'Helmet flame',     fx: ['Helmet flame', 'Flame shape'] },
+  { id: 'body',   title: 'Body and jacket',  parts: ['collar', 'jacket', 'trim', 'tunic', 'armor', 'frames', 'band'], fx: ['Trim embroidery'] },
+  { id: 'legs',   title: 'Legs',             parts: ['legs', 'caps', 'shoes', 'boots'] },
+  { id: 'effects', title: 'Effects',         fx: ['Body looks', 'Jacket looks'] },
+  { id: 'glow',   title: 'Glows',            fx: ['Glows and light'] },
+  { id: 'sword',  title: 'Hoversword',       fx: ['Hoversword', 'Booster jets'] },
+];
+const SUBTITLE = { 'Body looks': 'Body', 'Jacket looks': 'Jacket', 'Eyes': 'Eyes', 'Helmet lines': 'Helmet lines', 'Flame shape': 'Shape', 'Trim embroidery': 'Embroidery', 'Booster jets': 'Booster jets' };
+const secOfPart = k => (SECTIONS.find(x => (x.parts || []).includes(k)) || {}).id;
+const secOfFx = g => (SECTIONS.find(x => (x.fx || []).includes(g)) || {}).id;
+const ICON_RESET = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8a4.5 4.5 0 1 0 1.3-3.2M3.5 2.5v2.8h2.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHEV = '<svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
+function gradientCss(stops) {
+  if (stops.length === 1) return stops[0];
+  const n = 12, cols = [];
+  for (let i = 0; i <= n; i++) cols.push(Core.displayHex(stops, i / n));
+  return 'linear-gradient(90deg,' + cols.join(',') + ')';
+}
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function resetButton(label, fn) {
+  const b = el('button', 'icon reset'); b.type = 'button'; b.innerHTML = ICON_RESET; b.title = 'Reset to original';
+  b.setAttribute('aria-label', 'Reset ' + label); b.onclick = fn; return b;
+}
+function changedCount(sec) {
+  let n = 0;
+  (sec.parts || []).forEach(k => { if (design[k]) n++; });
+  (sec.fx || []).forEach(g => FX.forEach(f => { if (f.group === g && fx[f.key] != null) n++; }));
+  return n;
+}
+// one colour part: label, 1-3 swatches, solid/gradient choice, reset
+function partRow(p) {
+  const row = el('div', 'prop'); row.id = 'part-' + p.key;
+  if (design[p.key]) row.classList.add('changed');
+  if (selected === p.key) row.classList.add('sel');
+  const lbl = el('div', 'lbl'); lbl.appendChild(el('span', null, p.label));
+  const ctl = el('div', 'ctl');
+  const st = stopsOf(p.key), n = st.length;
+  if (p.axis) {
+    const mode = el('select', 'mode'); mode.setAttribute('aria-label', p.label + ': colours');
+    [['Solid', 1], ['Gradient', 2], ['3 colours', 3]].forEach(([t, v]) => { const o = el('option', null, t); o.value = v; if (v === n) o.selected = true; mode.appendChild(o); });
+    mode.onchange = () => setStopCount(p.key, Number(mode.value));
+    ctl.appendChild(mode);
+  }
+  st.forEach((hex, i) => {
+    const where = n === 1 ? '' : ' ' + (i === 0 ? (p.axis === 'u' ? 'shoulders' : 'top') : (i === n - 1 ? (p.axis === 'u' ? 'hem' : 'bottom') : 'middle'));
+    const sw = makeSwatch(hex, p.label + where,
+      h => { makeCustom(p.key)[i] = h; sw.title = (where.trim() || p.label) + ' ' + h.toUpperCase(); row.classList.add('changed'); recolor(); changed(); updateBadges(); },
+      () => { setActive({ key: p.key, index: i }); markSelected(p.key); });
+    sw.title = (where.trim() || p.label) + ' ' + hex.toUpperCase();
+    if (activeStop && activeStop.key === p.key && activeStop.index === i) sw.classList.add('active');
+    ctl.appendChild(sw);
+  });
+  row.append(lbl, ctl, resetButton(p.label, () => { design[p.key] = null; renderAll(); recolor(); changed(); }));
+  if (p.note && selected === p.key) row.appendChild(el('div', 'note', p.note));
+  return row;
+}
+const fmt = (f, v) => (f.step < 1 ? Number(v).toFixed(2).replace(/\.?0+$/, '') : String(Math.round(v)));
+// one effect setting: colour, number or image
+function fxRow(f) {
+  const row = el('div', 'prop'); row.id = 'fx-' + f.key;
+  if (fx[f.key] != null) row.classList.add('changed');
+  const lbl = el('div', 'lbl'); lbl.appendChild(el('span', null, f.label));
+  if (f.note) lbl.appendChild(el('small', null, f.note));
+  const ctl = el('div', 'ctl');
+  const after = () => { row.classList.add('changed'); recolor(); changed(); updateBadges(); };
+  if (isImageFx(f)) {
+    const thumb = el('span', 'thumb'); if (fx[f.key]) thumb.style.backgroundImage = 'url(' + fx[f.key] + ')';
+    const pick = el('button', 'btn small', fx[f.key] ? 'Change' : 'Upload'); pick.type = 'button';
+    pick.setAttribute('aria-label', (fx[f.key] ? 'Change ' : 'Upload ') + f.label);
+    pick.onclick = () => chooseImage(async file => {
+      try { fx[f.key] = await squareImage(file, 512); renderAll(); recolor(); changed(); }
+      catch (err) { status('fileStatus', 'Could not use that image: ' + err.message, true); }
+    });
+    ctl.append(thumb, pick);
+  } else if (isColourFx(f)) {
+    const sw = makeSwatch(fxVal(f.key).toLowerCase(), f.label, h => { fx[f.key] = h; sw.title = h.toUpperCase(); after(); }, () => setActive({ fx: f.key }));
+    sw.title = fxVal(f.key).toUpperCase();
+    if (activeStop && activeStop.fx === f.key) sw.classList.add('active');
+    ctl.append(sw);
+  } else {
+    const r = el('input'); r.type = 'range'; r.min = f.min; r.max = f.max; r.step = f.step; r.value = fxVal(f.key); r.setAttribute('aria-label', f.label);
+    const num = el('input', 'num'); num.type = 'text'; num.inputMode = 'decimal'; num.value = fmt(f, fxVal(f.key)); num.setAttribute('aria-label', f.label + ' value');
+    r.oninput = () => { fx[f.key] = Number(r.value); num.value = fmt(f, r.value); after(); };
+    num.onchange = () => { const v = Number(num.value); if (!isFinite(v)) { num.value = fmt(f, fxVal(f.key)); return; } fx[f.key] = Math.min(f.max, Math.max(f.min, v)); r.value = fx[f.key]; num.value = fmt(f, fx[f.key]); after(); };
+    ctl.append(r, num);
+  }
+  row.append(lbl, ctl, resetButton(f.label, () => { fx[f.key] = null; renderAll(); recolor(); changed(); }));
+  return row;
+}
+function setupSection(secEl, id) {
+  const head = secEl.querySelector('.sec-head');
+  const sync = () => { secEl.classList.toggle('open', openSecs.has(id)); head.setAttribute('aria-expanded', openSecs.has(id)); };
+  head.onclick = () => { openSecs.has(id) ? openSecs.delete(id) : openSecs.add(id); sync(); };
+  sync();
+}
+function renderSections() {
+  const host = $('sections'), keepScroll = host.parentElement.scrollTop;
+  host.innerHTML = '';
+  for (const sec of SECTIONS) {
+    const s = el('div', 'sec'); s.id = 'sec-' + sec.id;
+    const head = el('button', 'sec-head'); head.type = 'button';
+    head.innerHTML = CHEV + '<span class="title"></span><span class="badge"></span>';
+    head.querySelector('.title').textContent = sec.title;
+    s.appendChild(head);
+    const body = el('div', 'sec-body');
+    const parts = (sec.parts || []).map(k => BYKEY[k]).filter(Boolean);
+    if (parts.length) { if (sec.fx) body.appendChild(el('div', 'sub', 'Colours')); parts.forEach(p => body.appendChild(partRow(p))); }
+    for (const g of sec.fx || []) {
+      const items = FX.filter(f => f.group === g);
+      if (!items.length) continue;
+      if (SUBTITLE[g] && (parts.length || sec.fx.length > 1)) body.appendChild(el('div', 'sub', SUBTITLE[g]));
+      items.forEach(f => body.appendChild(fxRow(f)));
+      if (FX_NOTES[g]) body.appendChild(el('div', 'note', FX_NOTES[g]));
+    }
+    s.appendChild(body); host.appendChild(s);
+    setupSection(s, sec.id);
+  }
+  host.parentElement.scrollTop = keepScroll;
+  updateBadges();
+}
+function updateBadges() {
+  for (const sec of SECTIONS) {
+    const b = document.querySelector('#sec-' + sec.id + ' .badge'); if (!b) continue;
+    const n = changedCount(sec); b.textContent = n ? n + ' changed' : '';
+  }
+}
+['image', 'presets'].forEach(id => setupSection($('sec-' + id), id));
+function setStopCount(key, n) {
+  const st = stopsOf(key);
+  if (n === 1) design[key] = [st[0]];
+  else if (n === 2) design[key] = [st[0], st.length > 1 ? st[st.length - 1] : st[0]];
+  else design[key] = [st[0], Core.displayHex(st, 0.5), st.length > 1 ? st[st.length - 1] : st[0]];
+  renderAll(); recolor(); changed();
+}
+function setActive(a) {
+  activeStop = a;
+  document.querySelectorAll('.swatch').forEach(i => i.classList.remove('active'));
+  const e = a.fx ? document.querySelector('#fx-' + a.fx + ' .swatch') : document.querySelectorAll('#part-' + a.key + ' .swatch')[a.index];
+  if (e) e.classList.add('active');
+}
+function markSelected(key) {
+  if (selected === key) return;
+  selected = key; highlight();
+  document.querySelectorAll('.prop.sel').forEach(r => r.classList.remove('sel'));
+  const r = key && $('part-' + key); if (r) r.classList.add('sel');
+}
+function reveal(rowId, secId) {
+  if (secId && !openSecs.has(secId)) { openSecs.add(secId); const s = $('sec-' + secId); if (s) { s.classList.add('open'); s.querySelector('.sec-head').setAttribute('aria-expanded', 'true'); } }
+  const r = $(rowId); if (r) r.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function selectPart(key, scroll) {
+  selected = key; if (key) activeStop = { key, index: 0 };
+  renderAll(); highlight();
+  if (key && scroll) reveal('part-' + key, secOfPart(key));
+}
+function openEffects(group, key) {
+  const first = FX.find(f => f.group === group && (!key || f.key === key)); if (!first) return;
+  selected = null; highlight();
+  if (isColourFx(first)) activeStop = { fx: first.key };
+  renderAll(); reveal('fx-' + first.key, secOfFx(group));
+}
+
+/* ---------- images for pattern settings ---------- */
+// Ask for an image file; returns it to fn.
+function chooseImage(fn) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = () => { if (inp.files[0]) fn(inp.files[0]); };
+  inp.click();
+}
+// Any image -> a square PNG data URL (cover-cropped), the size the game's patterns use.
+async function squareImage(file, size) {
+  const img = await loadImage(file);
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'), w = img.naturalWidth, h = img.naturalHeight, k = Math.max(size / w, size / h);
+  g.drawImage(img, (size - w * k) / 2, (size - h * k) / 2, w * k, h * k);
+  return c.toDataURL('image/png');
+}
+const dataUrlBytes = u => { const b = atob(u.split(',')[1]), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+function renderAll() { renderSections(); }
+
+function applyColourToActive(hex) {
+  const target = activeStop || (selected ? { key: selected, index: 0 } : null);
+  if (!target) { status('paletteHint', 'Select a colour box first: click a swatch, or a part on the figure.', true); return; }
+  if (target.fx) fx[target.fx] = hex;
+  else makeCustom(target.key)[target.index] = hex;
+  renderAll();
+  setActive(target); recolor(); changed();
+}
+
+/* ---------- part map and original colour image ---------- */
+let IDS = null;
+const mapImg = new Image();
+mapImg.onload = () => {
+  const c = document.createElement('canvas'); c.width = DATA.width; c.height = DATA.height;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(mapImg, 0, 0);
+  const px = g.getImageData(0, 0, c.width, c.height).data; IDS = new Uint8Array(c.width * c.height);
+  for (let i = 0; i < IDS.length; i++) IDS[i] = px[i * 4];
+};
+mapImg.src = DATA.partmap;
+let BASE = null;
+const baseImg = new Image();
+baseImg.onload = () => {
+  const c = document.createElement('canvas'); c.width = baseImg.naturalWidth; c.height = baseImg.naturalHeight;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(baseImg, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data, px = new Uint8Array(c.width * c.height * 3);
+  for (let i = 0, j = 0; i < d.length; i += 4, j += 3) { px[j] = d[i]; px[j + 1] = d[i + 1]; px[j + 2] = d[i + 2]; }
+  BASE = { w: c.width, h: c.height, px };
+};
+baseImg.src = DATA.base;
+
+/* ---------- files ---------- */
+async function offerFile(filename, blob) {
+  try {
+    const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+    if (dl) { await dl.save({ filename, data: blob }); return 'saved'; }
+  } catch (e) {
+    if (e && e.code === 'declined') return 'declined';
+    if (e && e.code && e.code !== 'unavailable' && e.code !== 'not_granted') throw e;
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000); return 'saved';
+}
+// folder and file names that work on Windows
+function safeName(s) {
+  s = String(s || '').replace(/[\\/:*?"<>|\x00-\x1f]/g, '').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
+  if (!s || /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(s)) s = 'My Wraith';
+  return s.slice(0, 40);
+}
+function skinJson(name, author) {
+  const s = snapshot();
+  const effects = {};
+  for (const k in s.effects) if (!isImageFx(FXKEY[k])) effects[k] = s.effects[k];
+  return { name, author: author || '', format: 'wraith-skin', version: 2, made: 'WraithSkinMod website', parts: s.parts, effects };
+}
+function effectsTxt(name) {
+  const lines = ['; WraithSkinMod effects for "' + name + '". Colours are #RRGGBB. Remove a line to keep the original.'];
+  FX.forEach(f => { if (fx[f.key] != null && !isImageFx(f)) lines.push(f.key + '=' + (isColourFx(f) ? fx[f.key].toUpperCase() : fmt(f, fx[f.key]))); });
+  return lines.length > 1 ? lines.join('\r\n') + '\r\n' : null;
+}
+const canvasBlob = c => new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('could not make the image')), 'image/png'));
+async function colourPng() {
+  const px = Core.buildTexture(DATA, IDS, design, BASE);
+  const c = document.createElement('canvas'); c.width = DATA.width; c.height = DATA.height;
+  c.getContext('2d').putImageData(new ImageData(px, DATA.width, DATA.height), 0, 0);
+  return canvasBlob(c);
+}
+$('exportZip').onclick = async () => {
+  if (!IDS || !BASE) { status('fileStatus', 'Still loading the colour map, try again in a moment.', true); return; }
+  const name = $('skinName').value.trim() || 'My Wraith', folder = safeName(name), author = $('skinAuthor').value.trim();
+  status('fileStatus', 'Building the skin…');
+  try {
+    const enc = new TextEncoder(), files = [];
+    files.push({ name: folder + '/colours.png', data: new Uint8Array(await (await colourPng()).arrayBuffer()) });
+    const eff = effectsTxt(name); if (eff) files.push({ name: folder + '/effects.txt', data: enc.encode(eff) });
+    FX.forEach(f => { if (isImageFx(f) && fx[f.key]) files.push({ name: folder + '/' + f.file, data: dataUrlBytes(fx[f.key]) }); });
+    files.push({ name: folder + '/skin.json', data: enc.encode(JSON.stringify(skinJson(name, author), null, 2)) });
+    const prev = await previewPng(); if (prev) files.push({ name: folder + '/preview.png', data: new Uint8Array(await prev.arrayBuffer()) });
+    const r = await offerFile(folder + '.zip', new Blob([Zip.make(files)], { type: 'application/zip' }));
+    status('fileStatus', r === 'declined' ? 'Save cancelled.' : 'Downloaded ' + folder + '.zip. Unzip it into the mod\'s skins folder.');
+  } catch (e) { status('fileStatus', 'Could not save the skin here: ' + (e.message || e.code), true); }
+};
+$('exportPng').onclick = async () => {
+  if (!IDS || !BASE) { status('fileStatus', 'Still loading the colour map, try again in a moment.', true); return; }
+  try { const r = await offerFile('colours.png', await colourPng()); status('fileStatus', r === 'declined' ? 'Save cancelled.' : 'Downloaded colours.png (512 × 4096). Effects are only included in the .zip.'); }
+  catch (e) { status('fileStatus', 'Could not save the file here: ' + (e.message || e.code), true); }
+};
+
+/* ---------- zip (store only to write; store or deflate to read) ---------- */
+const Zip = (() => {
+  const T = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; }
+  const crc = d => { let c = 0xFFFFFFFF; for (let i = 0; i < d.length; i++) c = T[(c ^ d[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  function make(files) {
+    const enc = new TextEncoder(), now = new Date();
+    const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    const date = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    const locals = [], centrals = []; let offset = 0;
+    for (const f of files) {
+      const nm = enc.encode(f.name), c = crc(f.data), sz = f.data.length;
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+      lh.setUint16(10, time, true); lh.setUint16(12, date, true); lh.setUint32(14, c, true); lh.setUint32(18, sz, true); lh.setUint32(22, sz, true);
+      lh.setUint16(26, nm.length, true); lh.setUint16(28, 0, true);
+      locals.push(new Uint8Array(lh.buffer), nm, f.data);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+      ch.setUint16(12, time, true); ch.setUint16(14, date, true); ch.setUint32(16, c, true); ch.setUint32(20, sz, true); ch.setUint32(24, sz, true);
+      ch.setUint16(28, nm.length, true); ch.setUint32(42, offset, true);
+      centrals.push(new Uint8Array(ch.buffer), nm);
+      offset += 30 + nm.length + sz;
+    }
+    const cdSize = centrals.reduce((a, b) => a + b.length, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+    end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+    const parts = [...locals, ...centrals, new Uint8Array(end.buffer)];
+    const out = new Uint8Array(parts.reduce((a, b) => a + b.length, 0)); let o = 0;
+    for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  }
+  async function read(buf) {
+    const u = new Uint8Array(buf), v = new DataView(buf); let e = -1;
+    for (let i = u.length - 22; i >= Math.max(0, u.length - 65557); i--) if (v.getUint32(i, true) === 0x06054b50) { e = i; break; }
+    if (e < 0) throw new Error('not a zip file');
+    const count = v.getUint16(e + 10, true); let p = v.getUint32(e + 16, true);
+    const dec = new TextDecoder(), out = {};
+    for (let n = 0; n < count; n++) {
+      if (v.getUint32(p, true) !== 0x02014b50) throw new Error('damaged zip file');
+      const method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+      const nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true), lo = v.getUint32(p + 42, true);
+      const name = dec.decode(u.subarray(p + 46, p + 46 + nlen)); p += 46 + nlen + xlen + clen;
+      if (name.endsWith('/') || csize > 64e6) continue;
+      const start = lo + 30 + v.getUint16(lo + 26, true) + v.getUint16(lo + 28, true), raw = u.slice(start, start + csize);
+      out[name] = { method, raw };
+    }
+    return out;
+  }
+  async function data(entry) {
+    if (entry.method === 0) return entry.raw;
+    if (entry.method === 8 && window.DecompressionStream) {
+      const s = new Blob([entry.raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      return new Uint8Array(await new Response(s).arrayBuffer());
+    }
+    throw new Error('this zip uses a compression this browser cannot open');
+  }
+  return { make, read, data, crc };
+})();
+
+/* ---------- opening a skin ---------- */
+$('openFile').onclick = () => $('fileIn').click();
+function parseEffectsTxt(text) {
+  const out = {};
+  for (const line of text.replace(/^﻿/, '').split(/\r?\n/)) {
+    const s = line.trim(); if (!s || /^(;|\/\/|#)/.test(s)) continue;
+    const m = s.match(/^([\w]+)\s*=\s*(.*)$/); if (!m) continue;
+    const key = FX.find(f => f.key.toLowerCase() === m[1].toLowerCase() || f.key.toLowerCase().replace('colour', 'color') === m[1].toLowerCase());
+    if (key) out[key.key] = m[2].trim();
+  }
+  return out;
+}
+async function readColourImage(blob) {
+  const img = await loadImage(blob);
+  const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  const get = (x, y) => { const ix = Math.min(c.width - 1, Math.floor(x * c.width / DATA.width)), iy = Math.min(c.height - 1, Math.floor(y * c.height / DATA.height)); const o = (iy * c.width + ix) * 4; return [d[o] / 255, d[o + 1] / 255, d[o + 2] / 255]; };
+  return { parts: Core.readSkin(DATA, get), old: c.height !== DATA.height };
+}
+$('fileIn').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    let msg = 'Opened ' + f.name + '.';
+    if (/\.zip$/i.test(f.name) || f.type === 'application/zip' || f.type === 'application/x-zip-compressed') {
+      const entries = await Zip.read(await f.arrayBuffer()), names = Object.keys(entries);
+      const find = re => names.find(n => re.test(n.split('/').pop()));
+      const jn = find(/^skin\.json$/i), en = find(/^effects\.txt$/i);
+      const special = new Set(['preview.png', ...FX.filter(isImageFx).map(x => x.file)]);
+      const pn = find(/^colou?rs\.png$/i) || names.find(n => /\.png$/i.test(n) && !special.has(n.split('/').pop().toLowerCase()));
+      let j = jn ? JSON.parse(new TextDecoder().decode(await Zip.data(entries[jn]))) : null;
+      if (j && j.parts) { applySnapshot(j); }
+      else {
+        if (!pn && !en) throw new Error('no skin found inside');
+        const s = { parts: {}, effects: {} };
+        if (pn) { const r = await readColourImage(new Blob([await Zip.data(entries[pn])], { type: 'image/png' })); s.parts = r.parts; }
+        if (en) s.effects = parseEffectsTxt(new TextDecoder().decode(await Zip.data(entries[en])));
+        applySnapshot(s); msg = 'Read colours from ' + f.name + '.';
+      }
+      // pattern images stored as their own files
+      for (const x of FX.filter(isImageFx)) {
+        const n = find(new RegExp('^' + x.file.replace('.', '\\.') + '$', 'i'));
+        if (n) {
+          const bytes = await Zip.data(entries[n]);
+          fx[x.key] = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(new Blob([bytes], { type: 'image/png' })); });
+        }
+      }
+      $('skinName').value = (j && j.name) || (names[0] || '').split('/')[0] || ''; $('skinAuthor').value = (j && j.author) || '';
+    } else if (/\.json$/i.test(f.name) || f.type === 'application/json') {
+      const j = JSON.parse(await f.text());
+      if (!j || (!j.parts && !j.effects)) throw new Error('not a WraithSkinMod skin or preset');
+      applySnapshot(j); if (j.name) $('skinName').value = j.name; if (j.author) $('skinAuthor').value = j.author;
+    } else {
+      const r = await readColourImage(f); applySnapshot({ parts: r.parts });
+      msg = 'Read colours from ' + f.name + (r.old ? ' (older 512 × 512 layout: parts that share rows may come out the same).' : '.');
+    }
+    renderAll(); recolor(); changed(); status('fileStatus', msg);
+  } catch (err) { status('fileStatus', 'Could not open ' + f.name + ': ' + err.message, true); }
+};
+function loadImage(file) {
+  return new Promise((res, rej) => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('not an image')); i.src = u; });
+}
+
+/* ---------- colours from an image ---------- */
+const drop = $('imgDrop');
+drop.onclick = () => $('imgIn').click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('imgIn').click(); } };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) usePaletteImage(e.dataTransfer.files[0]); };
+$('imgIn').onchange = e => { if (e.target.files[0]) usePaletteImage(e.target.files[0]); e.target.value = ''; };
+let pickCanvas = null;
+async function usePaletteImage(file) {
+  try {
+    const img = await loadImage(file);
+    const s = Math.min(1, 160 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, c.width, c.height); pickCanvas = c;
+    $('pickImg').src = img.src; $('pickImg').style.display = 'block';
+    const d = g.getImageData(0, 0, c.width, c.height).data, pts = [];
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) pts.push([d[i], d[i + 1], d[i + 2]]);
+    showPalette(kmeans(pts, 8));
+  } catch (err) { status('paletteHint', 'Could not read that image: ' + err.message, true); }
+}
+function kmeans(pts, k) {
+  if (!pts.length) return [];
+  let cents = []; for (let i = 0; i < k; i++) cents.push(pts[Math.floor((i + 0.5) * pts.length / k)].slice());
+  let counts = new Array(k).fill(0);
+  for (let it = 0; it < 12; it++) {
+    const sums = cents.map(() => [0, 0, 0]); counts = new Array(k).fill(0);
+    for (const p of pts) {
+      let b = 0, bd = 1e9;
+      for (let j = 0; j < k; j++) { const dx = p[0] - cents[j][0], dy = p[1] - cents[j][1], dz = p[2] - cents[j][2], dd = dx * dx + dy * dy + dz * dz; if (dd < bd) { bd = dd; b = j; } }
+      sums[b][0] += p[0]; sums[b][1] += p[1]; sums[b][2] += p[2]; counts[b]++;
+    }
+    cents = cents.map((c, j) => counts[j] ? sums[j].map(v => v / counts[j]) : c);
+  }
+  const out = cents.map((c, j) => ({ c, n: counts[j] })).filter(o => o.n > 0).sort((a, b) => b.n - a.n);
+  const uniq = [];
+  for (const o of out) if (!uniq.some(u => Math.hypot(u.c[0] - o.c[0], u.c[1] - o.c[1], u.c[2] - o.c[2]) < 18)) uniq.push(o);
+  return uniq.map(o => Core.rgbToHex(o.c.map(v => v / 255)));
+}
+function showPalette(cols) {
+  const host = $('palette'); host.innerHTML = '';
+  cols.forEach(h => { const b = document.createElement('button'); b.type = 'button'; b.style.background = h; b.title = h; b.setAttribute('aria-label', 'Use colour ' + h); b.onclick = () => applyColourToActive(h); host.appendChild(b); });
+  status('paletteHint', cols.length ? 'Select a colour box above, then click a colour here or on the picture.' : 'No colours found in that picture.', !cols.length);
+}
+$('pickImg').onclick = e => {
+  if (!pickCanvas) return;
+  const r = e.target.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) / r.width * pickCanvas.width), y = Math.floor((e.clientY - r.top) / r.height * pickCanvas.height);
+  const d = pickCanvas.getContext('2d').getImageData(x, y, 1, 1).data;
+  applyColourToActive(Core.rgbToHex([d[0] / 255, d[1] / 255, d[2] / 255]));
+};
+
+/* ---------- start-up: presets and the last unsaved design ---------- */
+(function restore() {
+  const d = storageOk ? readJSON(DRAFT, null) : null;
+  if (d) {
+    applySnapshot(d); $('skinName').value = d.name || ''; $('skinAuthor').value = d.author || '';
+    if (d.preset && findPreset(d.preset)) currentPreset = d.preset;
+    cleanState = typeof d.clean === 'string' ? d.clean : JSON.stringify({ parts: {}, effects: {} });
+    if (!sameAsSaved()) status('presetStatus', 'Restored the design you were working on.');
+  }
+  if (!storageOk) status('presetStatus', 'This browser view cannot keep presets. You can still share and import preset files.', true);
+  renderPresets();
+})();
+
+/* ---------- 3D stand-in ---------- */
+let previewPng = async () => null;
+const canvas = $('view');
+if (!window.THREE) { window.recolor = () => {}; canvas.replaceWith(Object.assign(document.createElement('p'), { textContent: 'The 3D preview needs three.js, which did not load. The colour controls and download still work.', style: 'padding:20px;color:#9a9a9a' })); renderAll(); return; }
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 1, 2000);
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x2a2440, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(60, 120, 140); scene.add(sun);
+const rim = new THREE.DirectionalLight(0xc8d6ff, 0.55); rim.position.set(-80, 80, -140); scene.add(rim);
+const fig = new THREE.Group(); scene.add(fig);
+// smooth shading: average the normals of vertices that share a position, so rounded edges look soft
+function smoothNormals(geo) {
+  geo.computeVertexNormals();
+  const p = geo.attributes.position, n = geo.attributes.normal, acc = new Map();
+  const key = i => Math.round(p.getX(i) * 100) + ',' + Math.round(p.getY(i) * 100) + ',' + Math.round(p.getZ(i) * 100);
+  for (let i = 0; i < p.count; i++) { const k = key(i), a = acc.get(k) || [0, 0, 0]; a[0] += n.getX(i); a[1] += n.getY(i); a[2] += n.getZ(i); acc.set(k, a); }
+  for (let i = 0; i < p.count; i++) { const a = acc.get(key(i)), l = Math.hypot(a[0], a[1], a[2]) || 1; n.setXYZ(i, a[0] / l, a[1] / l, a[2] / l); }
+  n.needsUpdate = true;
+}
+// add a mesh; tFn maps a local vertex position to a gradient position for that part
+function add(geo, part, pos, rot, tFn, opts) {
+  geo = geo.index ? geo.toNonIndexed() : geo;
+  if (!(opts && opts.flat)) smoothNormals(geo); else geo.computeVertexNormals();
+  const n = geo.attributes.position.count; geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  geo.computeBoundingBox();
+  const o = { ...(opts || {}) }; delete o.flat;
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x000000, ...o });
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(...pos); if (rot) m.rotation.set(...rot);
+  m.userData = { part, tFn: tFn || null }; fig.add(m); meshes.push(m); return m;
+}
+function addTo(group, geo, part, pos, rot, tFn, opts) { const m = add(geo, part, pos, rot, tFn, opts); fig.remove(m); group.add(m); return m; }
+const sym = s => [s, -s];
+const vert = h => p => (h / 2 - p.y) / h;          // top-to-bottom over a shape's height
+// rounded box; flare widens the bottom (1 = straight), lean pushes the bottom back or forward
+function RB(w, h, d, r, opt) {
+  opt = opt || {};
+  const seg = opt.seg || 4, g = new THREE.BoxGeometry(w, h, d, seg + Math.ceil(w / 8), seg + Math.ceil(h / 8), seg + Math.ceil(d / 8)), p = g.attributes.position, v = new THREE.Vector3();
+  r = Math.min(r, w / 2, h / 2, d / 2);
+  const hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r;
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const c = new THREE.Vector3(Math.max(-hx, Math.min(hx, v.x)), Math.max(-hy, Math.min(hy, v.y)), Math.max(-hz, Math.min(hz, v.z)));
+    const dd = v.clone().sub(c); if (dd.lengthSq() > 0) dd.setLength(r);
+    let x = c.x + dd.x, y = c.y + dd.y, z = c.z + dd.z;
+    const t = 0.5 - y / h;                         // 0 at the top, 1 at the bottom
+    if (opt.flare) x *= 1 + (opt.flare - 1) * t;
+    if (opt.flareZ) z *= 1 + (opt.flareZ - 1) * t;
+    if (opt.lean) z += opt.lean * t;
+    p.setXYZ(i, x, y, z);
+  }
+  return g;
+}
+
+/* legs and feet */
+for (const x of sym(7.5)) {
+  add(RB(10.6, 2.4, 18.6, 1), 'boots', [x, 1.2, 2.2]);
+  add(RB(10, 6.5, 17.5, 2.6), 'shoes', [x, 5.6, 2]);
+  add(RB(9.6, 16, 9.6, 3), 'tunic', [x, 18, 0], null, vert(16));               // shin guard, lower
+  add(RB(10.2, 3, 10.2, 1.2), 'shoes', [x, 27.2, 0]);                           // strap
+  add(RB(9.8, 10, 9.8, 3), 'tunic', [x, 33.5, 0], null, vert(10));             // shin guard, upper
+  add(RB(8, 8, 3.4, 1.6), 'caps', [x, 43, 4.6]);                                // kneecap
+  add(RB(10, 9, 9.6, 3.2), 'shoes', [x, 43, 0]);                                // knee
+  add(RB(10.8, 24, 10.6, 3.2, { flare: 0.9 }), 'legs', [x, 59.5, 0], null, vert(24));
+}
+/* tunic, belt, skirt band, armour panels */
+add(RB(32, 22, 21, 4, { flare: 1.08, flareZ: 1.06 }), 'tunic', [0, 82, 0], null, vert(22));
+add(RB(35, 3.6, 23.4, 1.6), 'band', [0, 71.6, 0]);
+add(RB(28, 52, 18, 5), 'tunic', [0, 120, 0], null, vert(52));
+add(RB(29.5, 3.8, 19.6, 1.6), 'armor', [0, 96.5, 0]);
+function panel(z, cols, rows, w, h, cy) {
+  add(RB(w, h, 1.6, 0.7), 'frames', [0, cy, z], null, vert(h));
+  const cw = (w - 3) / cols, rh = (h - 3) / rows, s = Math.sign(z);
+  for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++)
+    add(RB(cw - 1.3, rh - 1.3, 1.1, 0.4, { seg: 2 }), 'armor', [-(w - 3) / 2 + cw * (c + 0.5), cy + (h - 3) / 2 - rh * (r + 0.5), z + s * 0.9]);
+}
+panel(10.3, 2, 9, 13, 62, 108);
+panel(-11.4, 4, 5, 20, 26, 71);                     // the panel hanging below the coat at the back
+/* collar: top and bottom rings follow the helmet, the middle ones carry the collar colour */
+const ring = (y, r, part, t) => add(new THREE.TorusGeometry(r, 2.1, 12, 36), part, [0, y, 0], [Math.PI / 2, 0, 0], t == null ? null : () => t);
+ring(161, 11.5, 'head'); ring(165, 11.2, 'collar', 0); ring(169, 10.9, 'collar', 0.5); ring(173, 10.6, 'collar', 1); ring(177, 10.2, 'head');
+/* head: mask, eyes, crest, helmet, spike */
+add(RB(14, 18, 13, 4), 'mask', [0, 186, 0.5], null, vert(18));
+for (const x of sym(3.6)) {
+  add(new THREE.TorusGeometry(2, 0.6, 8, 20), 'eyes', [x, 186, 7.1]);
+  add(new THREE.CircleGeometry(1.5, 18), 'glow', [x, 186, 7.05], null, null, { emissive: 0x7fd0ff, emissiveIntensity: 0.8 });
+}
+add(RB(16, 7, 3, 1.4), 'crest', [0, 194, 7.2], [-0.35, 0, 0], vert(7));
+add(RB(20, 8, 22, 4), 'head', [0, 197.5, -1.5]);
+add(new THREE.ConeGeometry(10.5, 20, 4, 3), 'head', [0, 210.5, -1.5], [0, Math.PI / 4, 0], null, { flat: true });
+const spike = new THREE.Group(); spike.position.set(0, 205, -12); spike.rotation.set(-0.55, 0, 0); fig.add(spike);
+addTo(spike, RB(3.2, 9, 22, 1.4), 'head', [0, 0, -4]);
+addTo(spike, RB(3.5, 3, 22.4, 1.2), 'band', [0, 0.3, -4]);
+/* jacket: a wide boxy coat. Back, sides and two front panels, flaring a little towards the hem.
+   The gradient fans from the shoulders down the back and towards the front opening. */
+const JT = 154, JB = 76, JH = JT - JB, JY = (JT + JB) / 2;
+const backT = p => Math.min(1, Math.max(0, (JH / 2 - p.y) / JH));
+add(RB(46, JH, 2.6, 1.2, { flare: 1.12, lean: -3 }), 'jacket', [0, JY, -12.5], null, backT);
+for (const s of [1, -1]) {
+  add(RB(2.6, JH, 25, 1.2, { flareZ: 1.1, lean: 0 }), 'jacket', [s * 23.6, JY, -0.5], null, p => 0.15 + 0.6 * backT(p) + 0.25 * Math.min(1, Math.max(0, (p.z + 12) / 24)));
+  add(RB(15, JH, 2.6, 1.2, { flare: 1.06, lean: 3 }), 'jacket', [s * 14.4, JY, 11.6], null, p => 0.3 + 0.7 * Math.max(0, Math.min(1, (-s * p.x + 7.5) / 15)));
+  add(RB(3.2, JH, 3.2, 1.2, { lean: 3 }), 'trim', [s * 7.2, JY, 12.6]);                        // front edges
+}
+// wide hem band all round, and the embroidery pattern just above it
+const hemY = JB + 4.5;
+add(RB(52, 7.5, 3.2, 1.4), 'trim', [0, hemY, -15.6]);
+for (const s of [1, -1]) {
+  add(RB(3.2, 7.5, 28, 1.4), 'trim', [s * 26.2, hemY, -0.6]);
+  add(RB(16.5, 7.5, 3.2, 1.4), 'trim', [s * 15, hemY, 14.6]);
+}
+const pattern = [];
+function stitch(x, y, z, ry) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1.1, 4.2, 0.6), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+  m.position.set(x, y, z); m.rotation.y = ry; m.userData = { part: 'fx:Trim embroidery' }; fig.add(m); pattern.push(m); fxMeshes.push(m);
+}
+for (let i = 0; i < 15; i++) stitch(-21 + i * 3, hemY + 7.2 + (i % 2) * 0.8, -16.6, 0);
+for (const s of [1, -1]) for (let i = 0; i < 4; i++) stitch(s * (10 + i * 3), hemY + 7.2 + (i % 2) * 0.8, 15.3, 0);
+// stand collar band where the coat meets the neck, and the shoulders
+add(RB(48, 7, 27, 3), 'jacket', [0, 153.5, 0], null, () => 0);
+add(RB(30, 4, 22, 2), 'trim', [0, 158.5, 0]);
+/* arms: wide straight sleeves with cuffs, gauntlets and claws */
+for (const s of [1, -1]) {
+  const arm = new THREE.Group(); arm.position.set(s * 23, 150, 0); arm.rotation.set(0, 0, s * 0.62); fig.add(arm);
+  addTo(arm, RB(16, 42, 17, 3, { flare: 1.2, flareZ: 1.15 }), 'jacket', [0, -21, 0], null, p => 0.05 + 0.2 * (21 - p.y) / 42);
+  addTo(arm, RB(19.5, 5, 20, 2), 'trim', [0, -43.5, 0]);
+  addTo(arm, RB(7, 16, 7, 2.4), 'collar', [0, -51, 0]);
+  for (let f = 0; f < 4; f++) addTo(arm, new THREE.ConeGeometry(0.95, 8, 8), 'collar', [(f - 1.5) * 1.8, -62, 1.4], [Math.PI, 0, (f - 1.5) * 0.08]);
+}
+/* hoversword under the feet: a long blade with engravings, a hilt, a glowing edge and a glowing tip.
+   Its colours follow the Hoversword effects; clicking it opens that group. */
+const sword = new THREE.Group(); sword.position.set(0, -2.6, 1); sword.rotation.set(0, 0.08, 0); fig.add(sword);
+const swordParts = { hilt: [], glyphs: [], trail: [] };
+const fxMat = (c, extra) => new THREE.MeshLambertMaterial({ color: c, ...(extra || {}) });
+const glowMat = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+function swordMesh(geo, mat, pos, list) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(...pos); m.userData = { part: 'fx:Hoversword' }; sword.add(m); fxMeshes.push(m);
+  if (list) list.push(m); return m;
+}
+const blade = new THREE.Shape();
+blade.moveTo(-58, -5.2); blade.lineTo(48, -5.2); blade.lineTo(70, 0); blade.lineTo(48, 5.2); blade.lineTo(-58, 5.2); blade.lineTo(-58, -5.2);
+const bladeGeo = new THREE.ExtrudeGeometry(blade, { depth: 1.6, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 0.6, bevelSegments: 3 });
+bladeGeo.rotateX(-Math.PI / 2);
+swordParts.blade = swordMesh(bladeGeo, fxMat(0xc0a06b), [0, 0, 0]);
+// hilt and cross guard at the back
+swordParts.hilt.push(swordMesh(RB(14, 3.2, 12.4, 1.2), fxMat(0x606c6a), [-62, 0.9, 0]));
+swordParts.hilt.push(swordMesh(RB(3.4, 3.6, 15, 1.2), fxMat(0x606c6a), [-55, 1, 0]));
+// engraved glyphs along the blade
+for (let i = 0; i < 12; i++) {
+  const x = -46 + i * 8, w = 2 + (i % 3), h = i % 2 ? 6 : 3.4;
+  swordMesh(new THREE.BoxGeometry(w, 0.5, h), fxMat(0x6b5a3a), [x, 2.45, 0], swordParts.glyphs);
+  if (i % 3 === 1) swordMesh(new THREE.BoxGeometry(5.5, 0.5, 1), fxMat(0x6b5a3a), [x, 2.45, 0], swordParts.glyphs);
+}
+// glowing edge line and the glowing tip (boost glow)
+swordParts.edge = swordMesh(new THREE.BoxGeometry(104, 0.6, 0.7), glowMat(0x00b3ff), [-5, 2.3, 5.6]);
+swordParts.tip = swordMesh(new THREE.SphereGeometry(3, 16, 12), glowMat(0x32d9ff), [-66, 1, 0]);
+// pulse ring on the ground, as a colour hint
+swordParts.pulse = new THREE.Mesh(new THREE.TorusGeometry(46, 0.9, 8, 72), glowMat(0x59bce7));
+swordParts.pulse.rotation.x = Math.PI / 2; swordParts.pulse.position.set(0, 0.5, 0); swordParts.pulse.material.opacity = 0.55;
+swordParts.pulse.userData = { part: 'fx:Pulse' }; fig.add(swordParts.pulse); fxMeshes.push(swordParts.pulse);
+// helmet flame: three glowing rings (outer, middle, core) circling the helmet
+const flame = new THREE.Group(); flame.position.set(0, 203, -1.5); flame.rotation.set(Math.PI / 2 - 0.25, 0, 0); fig.add(flame);
+const flameLayers = [['FlameOuter', 4.2, 0.30], ['FlameMiddle', 2.6, 0.55], ['FlameCore', 1.1, 0.95]].map(([key, tube, op]) => {
+  const m = new THREE.Mesh(new THREE.TorusGeometry(17.5, tube, 12, 64),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.userData = { part: 'fx:Helmet flame', key, base: op }; flame.add(m); fxMeshes.push(m); return m;
+});
+const eyeGlows = meshes.filter(m => m.userData.part === 'glow');
+
+function partColour(key, t) {
+  if (key === 'glow') return Core.hexToRgb(fxVal('EyeColour'));
+  const st = stopsOf(key); if (!st) return [1, 0, 1];
+  const p = BYKEY[key]; const tt = (p && p.axis && st.length > 1) ? t : 0;
+  return applyLooks(Core.evalLinear(st, tt).map(Core.l2s), JACKET_PARTS.has(key) ? 'Jacket' : 'Body');
+}
+// Rough stand-in versions of the body/jacket looks (the game's are richer)
+const JACKET_PARTS = new Set(['jacket', 'trim']);
+const rgbOf = h => Core.hexToRgb(h);
+const mix3 = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+function applyLooks(c, prefix) {
+  const v = k => fxVal(prefix + k);
+  const tint = rgbOf(v('Tint')); c = c.map((x, i) => x * tint[i]);
+  const lum = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2], sat = 1 + v('Saturation') * 0.5;
+  c = c.map(x => lum + (x - lum) * sat);
+  c = c.map(x => x * Math.sqrt(v('Brightness') / 4));
+  if (v('Lava') > 0) c = mix3(c, [1, 0.42, 0.05], v('Lava') * 0.8);
+  if (v('Damage') > 0) c = mix3(c, rgbOf(v('DamageColour')), v('Damage') * 0.85);
+  if (v('Dirt') > 0) c = mix3(c, [0.36, 0.28, 0.19], v('Dirt') * 0.45);
+  if (v('Wet') > 0) c = c.map(x => x * (1 - 0.2 * v('Wet')));
+  if (v('ShadingLines') < 0.95) c = c.map(x => x * (0.55 + 0.45 * v('ShadingLines') / 0.95));
+  if (v('Silhouette') > 0) c = mix3(c, [0.02, 0.02, 0.03], v('Silhouette'));
+  return c.map(x => Math.max(0, Math.min(1, x)));
+}
+function lookGlow(prefix) {
+  const g = new THREE.Color(0, 0, 0);
+  const a = fxVal(prefix + 'AuraStrength'); if (a > 0) g.add(new THREE.Color(fxVal(prefix + 'Aura')).multiplyScalar(0.35 * a));
+  const l = fxVal(prefix + 'Lava'); if (l > 0) g.add(new THREE.Color(1, 0.35, 0).multiplyScalar(0.25 * l));
+  return g;
+}
+const tmp = new THREE.Vector3();
+function recolor() {
+  if (!meshes.length) return;
+  for (const m of meshes) {
+    const { part, tFn } = m.userData, pos = m.geometry.attributes.position, col = m.geometry.attributes.color;
+    for (let i = 0; i < pos.count; i++) {
+      tmp.fromBufferAttribute(pos, i);
+      const c = partColour(part, tFn ? tFn(tmp) : 0);
+      col.setXYZ(i, c[0], c[1], c[2]);
+    }
+    col.needsUpdate = true;
+    if (part !== 'glow') m.userData.baseEmissive = lookGlow(JACKET_PARTS.has(part) ? 'Jacket' : 'Body');
+  }
+  const eye = new THREE.Color(fxVal('EyeColour')), eg = Math.min(1.2, 0.25 + fxVal('EyeGlow') / 30);
+  eyeGlows.forEach(m => { m.material.emissive.copy(eye); m.material.emissiveIntensity = eg; });
+  const bright = Math.min(1.6, fxVal('FlameBrightness') * (0.6 + fxVal('FlameGlow') / 5));
+  flameLayers.forEach(m => {
+    m.material.color.set(fxVal(m.userData.key));
+    const extra = m.userData.key === 'FlameCore' ? Math.min(1.3, 0.4 + fxVal('FlameCoreGlow') / 25) : 1;
+    m.material.opacity = Math.min(1, m.userData.base * bright * extra);
+    m.scale.set(1, 1, fxVal('FlameWidth'));
+  });
+  if (typeof swordParts !== 'undefined') {
+    const mixHex = (a, b, t) => { const A = new THREE.Color(a), Bc = new THREE.Color(b); return A.lerp(Bc, t); };
+    let bladeC = mixHex(fxVal('SwordBlade'), fxVal('SwordTint'), 0.55);
+    if (fxVal('SwordSilhouette') > 0) bladeC.lerp(new THREE.Color(0.02, 0.02, 0.03), fxVal('SwordSilhouette'));
+    swordParts.blade.material.color.copy(bladeC);
+    swordParts.blade.material.emissive = new THREE.Color(fxVal('SwordGlow')).multiplyScalar(0.4 * fxVal('SwordAuraStrength'));
+    swordParts.hilt.forEach(m => m.material.color.set(fxVal('SwordHilt')));
+    const g = bladeC.clone().multiplyScalar(1 - 0.75 * fxVal('SwordGlyphDarkness'));
+    swordParts.glyphs.forEach(m => m.material.color.copy(g));
+    swordParts.edge.material.color.set(fxVal('SwordGlow'));
+    swordParts.tip.material.color.set(fxVal('SwordBoostGlow'));
+    swordParts.pulse.material.color.set('#59BCE7');   // pulse ring: fixed colour in the game
+    swordParts.trail.forEach((m, i) => m.material.color.set(i % 2 ? '#00A4FF' : '#FFB200'));
+  }
+  if (typeof pattern !== 'undefined') pattern.forEach(m => m.material.color.set(fxVal('TrimColour')).multiplyScalar(0.6 + fxVal('TrimBrightness')));
+  highlight(); needsRender = true;
+}
+function highlight() {
+  for (const m of meshes) {
+    if (!m.material.emissive || m.userData.part === 'glow') continue;
+    if (selected && m.userData.part === selected) m.material.emissive.setHex(0x2a2a10);
+    else m.material.emissive.copy(m.userData.baseEmissive || new THREE.Color(0, 0, 0));
+  }
+  needsRender = true;
+}
+// camera orbit
+let yaw = 0.35, pitch = 0.08, dist = 430;
+const target = new THREE.Vector3(0, 110, 0);
+function placeCamera() {
+  camera.position.set(target.x + dist * Math.sin(yaw) * Math.cos(pitch), target.y + dist * Math.sin(pitch), target.z + dist * Math.cos(yaw) * Math.cos(pitch));
+  camera.lookAt(target);
+}
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); needsRender = true;
+}
+new ResizeObserver(resize).observe(canvas);
+let drag = null;
+canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; canvas.setPointerCapture(e.pointerId); canvas.classList.add('dragging'); });
+canvas.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.moved += Math.abs(dx) + Math.abs(dy); drag.x = e.clientX; drag.y = e.clientY;
+  yaw -= dx * 0.008; pitch = Math.max(-0.6, Math.min(0.9, pitch + dy * 0.006)); needsRender = true;
+});
+canvas.addEventListener('pointerup', e => {
+  canvas.classList.remove('dragging');
+  if (drag && drag.moved < 5) pick(e);
+  drag = null;
+});
+canvas.addEventListener('wheel', e => { e.preventDefault(); dist = Math.max(160, Math.min(700, dist * (e.deltaY > 0 ? 1.08 : 0.92))); needsRender = true; }, { passive: false });
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pick(e) {
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(meshes.concat(fxMeshes), false)[0];
+  const part = hit ? hit.object.userData.part : null;
+  if (part === 'glow') { openEffects('Eyes', 'EyeColour'); return; }
+  if (part && part.startsWith('fx:')) { if (secOfFx(part.slice(3))) openEffects(part.slice(3)); return; }
+  selectPart(part, true);
+}
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { yaw = { front: 0.35, side: Math.PI / 2, back: Math.PI + 0.35 }[b.dataset.view]; pitch = 0.08; needsRender = true; });
+// square front-view picture for preview.png
+previewPng = async () => {
+  try {
+    const keep = { yaw, pitch, dist, sel: selected, w: canvas.clientWidth, h: canvas.clientHeight, ratio: renderer.getPixelRatio() };
+    selected = null; highlight();
+    renderer.setPixelRatio(1); renderer.setSize(512, 512, false); camera.aspect = 1; camera.updateProjectionMatrix();
+    yaw = 0.35; pitch = 0.08; dist = 470; placeCamera(); renderer.render(scene, camera);
+    const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
+    const grd = g.createRadialGradient(256, 180, 20, 256, 220, 380); grd.addColorStop(0, '#2e2e2e'); grd.addColorStop(1, '#1c1c1c');
+    g.fillStyle = grd; g.fillRect(0, 0, 512, 512); g.drawImage(renderer.domElement, 0, 0, 512, 512);
+    yaw = keep.yaw; pitch = keep.pitch; dist = keep.dist; selected = keep.sel;
+    renderer.setPixelRatio(keep.ratio); resize(); highlight();
+    return await canvasBlob(c);
+  } catch (e) { return null; }
+};
+(function loop() {
+  if (needsRender) { placeCamera(); renderer.render(scene, camera); needsRender = false; }
+  requestAnimationFrame(loop);
+})();
+renderAll(); recolor(); resize();
+})();
+</script>
+</body>
+</html>

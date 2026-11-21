@@ -1,0 +1,90 @@
+{
+  "name": "Red Wraith",
+  "author": "WraithSkinMod",
+  "format": "wraith-skin",
+  "version": 2,
+  "made": "WraithSkinMod website",
+  "parts": {
+    "head": [
+      "#a09488"
+    ],
+    "crest": [
+      "#a1968a"
+    ],
+    "mask": [
+      "#e9dfc9",
+      "#726e66",
+      "#292726"
+    ],
+    "eyes": [
+      "#ff0000"
+    ],
+    "collar": [
+      "#262523"
+    ],
+    "jacket": [
+      "#ff0000",
+      "#000000"
+    ],
+    "trim": [
+      "#121111"
+    ],
+    "tunic": [
+      "#ff0000"
+    ],
+    "armor": [
+      "#161515"
+    ],
+    "frames": [
+      "#400000"
+    ],
+    "band": [
+      "#131111"
+    ],
+    "legs": [
+      "#1f1d1d"
+    ],
+    "caps": [
+      "#ff0000"
+    ],
+    "shoes": [
+      "#1c1f1e"
+    ],
+    "boots": [
+      "#262423"
+    ]
+  },
+  "effects": {
+    "FlameOuter": "#760000",
+    "FlameMiddle": "#ff0000",
+    "FlameCore": "#ff0000",
+    "FlameBrightness": 1.35,
+    "FlameGlow": 3.5,
+    "FlameCoreGlow": 21.5,
+    "FlameWidth": 1.55,
+    "FlameFalloff": 1.54,
+    "FlameSwirl": 1.53,
+    "FlameSpeed": 2,
+    "EyeColour": "#4b0000",
+    "HelmetLines1": "#121413",
+    "HelmetLines2": "#161917",
+    "GlowColour": "#d2000b",
+    "PulseFlash": "#ff0000",
+    "BoostCharge": "#af0020",
+    "FlameLight": "#980000",
+    "FlameLightStrength": 0.7,
+    "TrimColour": "#0e0e0d",
+    "BodyAuraStrength": 0,
+    "BodyLava": 0.1,
+    "BodyDirt": 0,
+    "BodySilhouette": 0,
+    "JacketLava": 0.1,
+    "SwordTint": "#000000",
+    "SwordBlade": "#2c2a28",
+    "SwordHilt": "#700303",
+    "SwordGlyphDarkness": 1,
+    "SwordGlint": "#ff7c7c",
+    "SwordGlow": "#ff0000",
+    "SwordAuraStrength": 0.15
+  }
+}

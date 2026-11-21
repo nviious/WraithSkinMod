@@ -1,0 +1,25 @@
+; WraithSkinMod effects for "Cotton Candy". Colours are #RRGGBB. Remove a line to keep the original.
+FlameOuter=#760067
+FlameMiddle=#FA00FF
+FlameCore=#00B1FF
+FlameBrightness=1.6
+FlameFalloff=1.66
+FlameSparkle=1.4
+FlameTaper=0.3
+FlameSpeed=0.5
+EyeColour=#DB24FF
+HelmetLines1=#141932
+HelmetLines2=#141932
+GlowColour=#DB24FF
+PulseFlash=#CD00FF
+BoostCharge=#801B6D
+FlameLight=#DB24FF
+SwordTint=#1F2F81
+SwordBlade=#801B6D
+SwordHilt=#F100FD
+SwordGlyphDarkness=0.2
+SwordGlint=#EF31FF
+SwordGlow=#CD00FF
+SwordAuraStrength=0
+SwordSilhouette=0.1
+SwordBoostGlow=#FF32F7

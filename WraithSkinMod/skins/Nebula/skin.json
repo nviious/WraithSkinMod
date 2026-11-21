@@ -1,0 +1,80 @@
+{
+  "name": "Nebula",
+  "author": "WraithSkinMod",
+  "format": "wraith-skin",
+  "version": 2,
+  "made": "WraithSkinMod website",
+  "parts": {
+    "head": [
+      "#65318d"
+    ],
+    "crest": [
+      "#4d226e"
+    ],
+    "mask": [
+      "#2e1c61",
+      "#4d226e",
+      "#7e64af"
+    ],
+    "eyes": [
+      "#030203"
+    ],
+    "collar": [
+      "#66328e"
+    ],
+    "jacket": [
+      "#0f0a0f",
+      "#1f121f",
+      "#591b59"
+    ],
+    "trim": [
+      "#68358f"
+    ],
+    "tunic": [
+      "#68358f"
+    ],
+    "armor": [
+      "#68358f"
+    ],
+    "frames": [
+      "#1f121f"
+    ],
+    "band": [
+      "#9349cc"
+    ],
+    "legs": [
+      "#4d226e"
+    ],
+    "caps": [
+      "#7917c5"
+    ],
+    "shoes": [
+      "#65318d"
+    ],
+    "boots": [
+      "#1f121f"
+    ]
+  },
+  "effects": {
+    "FlameOuter": "#4d226e",
+    "FlameMiddle": "#68358f",
+    "FlameCore": "#9349cc",
+    "FlameSwirl": 3,
+    "FlameSparkle": 1.5,
+    "FlameSpeed": 0.2,
+    "EyeColour": "#68358f",
+    "EyeGlow": 50,
+    "HelmetLines1": "#65318d",
+    "HelmetLines2": "#68358f",
+    "GlowColour": "#68358f",
+    "PulseFlash": "#9349cc",
+    "BoostCharge": "#68358f",
+    "FlameLight": "#9349cc",
+    "SwordTint": "#7917c5",
+    "SwordBlade": "#1f121f",
+    "SwordHilt": "#65318d",
+    "SwordGlint": "#68358f",
+    "SwordGlow": "#9349cc",
+    "SwordBoostGlow": "#7917c5"
+  }
+}

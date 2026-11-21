@@ -1,0 +1,83 @@
+{
+  "name": "Jolly",
+  "author": "WraithSkinMod",
+  "format": "wraith-skin",
+  "version": 2,
+  "made": "WraithSkinMod website",
+  "parts": {
+    "head": [
+      "#ffffff"
+    ],
+    "crest": [
+      "#e0c1c1"
+    ],
+    "mask": [
+      "#ebe5d8",
+      "#d5b2a0",
+      "#c12b2b"
+    ],
+    "eyes": [
+      "#f6f2e5"
+    ],
+    "collar": [
+      "#ebe5d8"
+    ],
+    "jacket": [
+      "#c12b2b"
+    ],
+    "trim": [
+      "#f6f2e5"
+    ],
+    "tunic": [
+      "#f6f2e5"
+    ],
+    "armor": [
+      "#a10707"
+    ],
+    "frames": [
+      "#ffffff"
+    ],
+    "legs": [
+      "#ffffff"
+    ],
+    "caps": [
+      "#f6f2e5"
+    ],
+    "shoes": [
+      "#ebe5d8"
+    ],
+    "boots": [
+      "#c12b2b"
+    ]
+  },
+  "effects": {
+    "FlameOuter": "#a10707",
+    "FlameMiddle": "#ff4748",
+    "FlameCore": "#d4e4e5",
+    "EyeColour": "#a10707",
+    "HelmetLines1": "#ffffff",
+    "HelmetLines2": "#999999",
+    "GlowColour": "#ffffff",
+    "PulseFlash": "#d4e4e5",
+    "BoostCharge": "#c12b2b",
+    "FlameLight": "#a10707",
+    "BodyTint": "#7d1010",
+    "BodySaturation": 1.3,
+    "BodyAura": "#ff4748",
+    "BodyFlash": "#b71d1e",
+    "BodyLava": 0.3,
+    "BodyLavaColour": "#ffffff",
+    "BodyLavaGlowColour": "#ffffff",
+    "JacketAura": "#e3caca",
+    "JacketFlash": "#d4e4e5",
+    "JacketLava": 0.3,
+    "JacketLavaColour": "#b71d1e",
+    "JacketLavaGlowColour": "#ff4748",
+    "SwordTint": "#a10707",
+    "SwordBlade": "#d4e4e5",
+    "SwordHilt": "#c12b2b",
+    "SwordGlint": "#b71d1e",
+    "SwordGlow": "#ff4748",
+    "SwordBoostGlow": "#c12b2b"
+  }
+}
